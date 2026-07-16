@@ -1,9 +1,9 @@
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const CatalogClientPage = dynamic(
+const CatalogClientPage = nextDynamic(
   () => import('@/components/public/CatalogClientPage'),
   {
     ssr: false,
