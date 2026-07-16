@@ -14,7 +14,6 @@ import {
 import type { SimulationCatalog, SimulationSearchFilters } from '@/types';
 import { getDemoCatalogTree, listDemoSimulationsPaginated } from '@/lib/simulations';
 import { useAuth } from '@/context/AuthContext';
-import PublicHeader from './PublicHeader';
 import SimulationCard from './SimulationCard';
 import { SimulationSkeletonList } from './SimulationSkeleton';
 import CatalogTreeFilter from './CatalogTreeFilter';
@@ -343,8 +342,6 @@ export default function CatalogClientPage() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f9f9fa' }}>
-      <PublicHeader />
-
       <div className="public-catalog-content">
 
 

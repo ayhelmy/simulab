@@ -1,12 +1,8 @@
-import React, { Suspense } from 'react';
-import CatalogClientPage from '@/components/public/CatalogClientPage';
+import React from 'react';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default function PublicCatalog() {
-  return (
-    <Suspense fallback={<div style={{ minHeight: '60vh' }} />}>
-      <CatalogClientPage />
-    </Suspense>
-  );
+  return <div style={{ minHeight: '60vh' }} />;
 }
