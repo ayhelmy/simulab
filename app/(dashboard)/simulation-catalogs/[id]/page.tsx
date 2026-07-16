@@ -10,7 +10,8 @@ import { useRouteGuard } from '@/hooks/useRouteGuard';
 import {
   Tabs, Table, Tag, Button, Spin, Alert, Typography, Modal, Form,
   Input, Select, Popconfirm, App, Avatar, Breadcrumb, Card, Row, Col,
-  Space, Statistic, Descriptions, Upload, Progress, Radio, Tooltip, type TableColumnsType,
+  Space, Statistic, Descriptions, Upload, Progress, Radio, Tooltip,
+  type TableColumnsType, type InputRef,
 } from 'antd';
 import {
   ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ExperimentOutlined,
@@ -983,7 +984,7 @@ function UnassignImpactModal({
   const [confirmText,   setConfirmText]   = useState('');
   const [unassigning,   setUnassigning]   = useState(false);
   const { message }  = App.useApp();
-  const inputRef     = useRef<typeof Input>(null);
+  const inputRef     = useRef<InputRef | null>(null);
 
   useEffect(() => {
     setLoadingImpact(true);
@@ -1097,7 +1098,7 @@ function UnassignImpactModal({
               Type <Typography.Text code>{CONFIRM_KEYWORD}</Typography.Text> to confirm:
             </Typography.Text>
             <Input
-              ref={inputRef as React.Ref<HTMLInputElement>}
+              ref={inputRef}
               style={{ marginTop: 8 }}
               placeholder={CONFIRM_KEYWORD}
               value={confirmText}
