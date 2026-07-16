@@ -3,7 +3,7 @@
 // Next.js 16: params is a Promise — must await in server components.
 // This is a client component so we use use(params) instead.
 
-import { useState, useEffect, useCallback, use, useRef } from 'react';
+import { useState, useEffect, useCallback, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
@@ -11,7 +11,7 @@ import {
   Tabs, Table, Tag, Button, Spin, Alert, Typography, Modal, Form,
   Input, Select, Popconfirm, App, Avatar, Breadcrumb, Card, Row, Col,
   Space, Statistic, Descriptions, Upload, Progress, Radio, Tooltip,
-  type TableColumnsType, type InputRef,
+  type TableColumnsType,
 } from 'antd';
 import {
   ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ExperimentOutlined,
@@ -984,7 +984,6 @@ function UnassignImpactModal({
   const [confirmText,   setConfirmText]   = useState('');
   const [unassigning,   setUnassigning]   = useState(false);
   const { message }  = App.useApp();
-  const inputRef     = useRef<InputRef | null>(null);
 
   useEffect(() => {
     setLoadingImpact(true);
@@ -1098,7 +1097,6 @@ function UnassignImpactModal({
               Type <Typography.Text code>{CONFIRM_KEYWORD}</Typography.Text> to confirm:
             </Typography.Text>
             <Input
-              ref={inputRef}
               style={{ marginTop: 8 }}
               placeholder={CONFIRM_KEYWORD}
               value={confirmText}

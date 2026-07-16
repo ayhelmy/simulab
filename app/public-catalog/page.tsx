@@ -1,9 +1,12 @@
-import { ClientPageRoot } from 'next/dist/client/components/client-page'
-import React from 'react'
+import React, { Suspense } from 'react';
 import CatalogClientPage from '@/components/public/CatalogClientPage';
+
+export const dynamic = 'force-dynamic';
 
 export default function PublicCatalog() {
   return (
-    <CatalogClientPage/>
-  )
+    <Suspense fallback={<div style={{ minHeight: '60vh' }} />}>
+      <CatalogClientPage />
+    </Suspense>
+  );
 }
