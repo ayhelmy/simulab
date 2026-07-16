@@ -46,7 +46,7 @@ export default function DashboardPage() {
         title={`Welcome back, ${user.firstName}!`}
         subtitle={
           isSuperAdmin       ? 'Platform overview' :
-          isInstitutionAdmin ? `Managing ${user.institutionName ?? 'your institution'}` :
+          isInstitutionAdmin ? `Managing ${(user as any).institutionName ?? 'your institution'}` :
           isInstructor       ? 'Your teaching overview' :
           'Your learning progress'
         }
