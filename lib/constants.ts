@@ -1,6 +1,9 @@
 // SRS §4.1: token TTLs, pagination defaults, role lists.
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://172.20.44.1:5000/api/v1';
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  process.env.REACT_APP_API_BASE_URL ??
+  'https://backend-production-a76c.up.railway.app/api/v1';
 
 export const ACCESS_TOKEN_KEY = 'sl_access_token';  // in-memory only (never localStorage)
 
