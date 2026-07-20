@@ -17,7 +17,7 @@ import { getDashboardStats } from '@/lib/dashboard';
 const { Text, Title } = Typography;
 
 export default function DashboardPage() {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, institutionName } = useAuth();
   const router = useRouter();
 
   const isSuperAdmin       = hasRole('super_admin');
@@ -46,7 +46,7 @@ export default function DashboardPage() {
         title={`Welcome back, ${user.firstName}!`}
         subtitle={
           isSuperAdmin       ? 'Platform overview' :
-          isInstitutionAdmin ? `Managing ${(user as any).institutionName ?? 'your institution'}` :
+          isInstitutionAdmin ? `Managing ${institutionName ?? 'your institution'}` :
           isInstructor       ? 'Your teaching overview' :
           'Your learning progress'
         }
