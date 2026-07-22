@@ -11,8 +11,15 @@ const nextConfig: NextConfig = {
   ],
   images: {
     remotePatterns: [
-      // CloudFront CDN for S3-hosted images (SRS §8 AWS S3 + CloudFront)
+      // CloudFront CDN
       { protocol: 'https', hostname: '**.cloudfront.net' },
+      
+      // ADD YOUR RAILWAY BACKEND DOMAIN HERE
+      { protocol: 'https', hostname: '**.up.railway.app' },
+      
+      // ADD LOCALHOST FOR LOCAL DEVELOPMENT
+      { protocol: 'http', hostname: 'localhost' },
+      { protocol: 'http', hostname: '127.0.0.1' },
     ],
   },
   async headers() {
