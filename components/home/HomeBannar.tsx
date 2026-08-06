@@ -395,7 +395,7 @@ background-size: 100% 300%;
                     {/* Logo + brand name */}
                     <div className="hero-logo-row">
                         <img
-                            src="/BEDO-logo.png"
+                            src="/bedo-logo.png"
                             alt="BEDO logo"
                             className="hero-logo-img"
                             onError={(e) => { (e.target as HTMLImageElement).src = '/Virtual-logo.png'; }}
