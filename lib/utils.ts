@@ -25,3 +25,20 @@ export function buildQueryString(params: Record<string, unknown>): string {
 export function getInitials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
 }
+
+export function normalizeSecureUrl(url: string | null | undefined): string {
+  if (!url) return '';
+
+  try {
+    const parsed = new URL(url);
+    const localHosts = new Set(['localhost', '127.0.0.1', '::1']);
+
+    if (parsed.protocol === 'http:' && !localHosts.has(parsed.hostname)) {
+      parsed.protocol = 'https:';
+    }
+
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}

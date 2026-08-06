@@ -40,6 +40,7 @@ import {
   type ClickEvent,
 } from '@/lib/simulation-activity';
 import { getSimulationLaunch } from '@/lib/simulations';
+import { normalizeSecureUrl } from '@/lib/utils';
 import type { ActivityStartResult, ActivityEndResult } from '@/types';
 import {
   Button, Spin, Result, Space, Typography, Tag, Tooltip, Statistic, Modal, Alert,
@@ -310,6 +311,7 @@ export default function SimulationPlayPage({ params }: Props) {
   };
 
   const backHref = courseId ? `/courses/${courseId}/home` : '/simulations';
+  const iframeSrc = launchInfo ? normalizeSecureUrl(launchInfo.launchUrl) : '';
 
   // ── States ────────────────────────────────────────────────────────────────────
 
@@ -500,7 +502,7 @@ export default function SimulationPlayPage({ params }: Props) {
       >
         <iframe
           ref={iframeRef}
-          src={launchInfo.launchUrl}
+          src={iframeSrc}
           title={launchInfo.title}
           allow="fullscreen; autoplay; clipboard-read; clipboard-write"
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}

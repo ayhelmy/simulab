@@ -18,6 +18,7 @@ import {
 } from '@ant-design/icons';
 import { demoLaunchSimulation } from '@/lib/simulations';
 import type { LaunchResult } from '@/lib/simulations';
+import { normalizeSecureUrl } from '@/lib/utils';
 
 const { Text } = Typography;
 
@@ -74,6 +75,7 @@ export default function PublicSimPlayPage({ params }: Props) {
   }, []);
 
   const backHref = `/sim/${simulationId}`;
+  const iframeSrc = launchInfo ? normalizeSecureUrl(launchInfo.launchUrl) : '';
 
   // -- Loading ------------------------------------------------------------------─
 
@@ -201,7 +203,7 @@ export default function PublicSimPlayPage({ params }: Props) {
       >
         <iframe
           ref={iframeRef}
-          src={launchInfo.launchUrl}
+          src={iframeSrc}
           title={launchInfo.title}
           allow="fullscreen; autoplay; clipboard-read; clipboard-write"
           style={{

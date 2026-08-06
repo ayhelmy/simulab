@@ -6,18 +6,21 @@
  * TODO: implement SCORM API bridge + session management (skeleton only)
  */
 
+import { normalizeSecureUrl } from '@/lib/utils';
+
 interface SimulationPlayerProps {
   launchUrl: string;
   sessionId: string;
 }
 
 export default function SimulationPlayer({ launchUrl, sessionId }: SimulationPlayerProps) {
+  const iframeSrc = normalizeSecureUrl(launchUrl);
   // TODO: inject window.API_1484_11 SCORM 2004 bridge before iframe loads
   // TODO: listen for Terminate() call to persist session state
   return (
     <div style={{ width: '100%', height: '100%', minHeight: 600 }}>
       <iframe
-        src={launchUrl}
+        src={iframeSrc}
         title="Simulation"
         data-session-id={sessionId}
         style={{ width: '100%', height: '100%', border: 'none' }}
