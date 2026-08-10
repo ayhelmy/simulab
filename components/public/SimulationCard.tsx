@@ -33,6 +33,7 @@ export default function SimulationCard({ simulation, isAuthenticated }: Props) {
   const isDemo = simulation.visibility === 'demo_public' || simulation.visibility === "demo_and_institution";
 
   function handleViewDetails() {
+    if (!simulation.id) return;
     router.push(`/sim/${simulation.id}`);
   }
 
@@ -139,7 +140,7 @@ export default function SimulationCard({ simulation, isAuthenticated }: Props) {
                 size="small"
                 type="primary"
                 icon={<PlayCircleOutlined />}
-                onClick={(e) => { e.stopPropagation(); router.push(`/sim/${simulation.id}`); }}
+                onClick={(e) => { e.stopPropagation(); handleViewDetails(); }}
                 className="sim-btn-demo"
               >
                 Preview
@@ -150,6 +151,7 @@ export default function SimulationCard({ simulation, isAuthenticated }: Props) {
                 icon={<LockOutlined />}
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!simulation.id) return;
                   router.push(`/login?next=${encodeURIComponent(`/sim/${simulation.id}`)}`);
                 }}
                 className="sim-btn-login"
