@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { login } from '@/lib/auth';
 import type { ApiError } from '@/types/api';
@@ -14,14 +13,10 @@ const { Title, Text } = Typography;
 interface LoginFields { email: string; password: string }
 
 export default function LoginPage() {
-  const router = useRouter();
-  const params = useSearchParams();
   const { login: setAuthState } = useAuth();
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const next = params.get('next') || '/dashboard';
 
   async function handleFinish(values: LoginFields) {
     setLoading(true);
@@ -29,8 +24,10 @@ export default function LoginPage() {
     try {
       const { accessToken, user } = await login({ email: values.email, password: values.password });
       setAuthState(user, accessToken);
-      console.log('Login successful, redirecting to:', user);
-      router.replace(next);
+      // Don't navigate here — AuthGuard's effect (in the parent auth layout) redirects
+      // once `user` is committed to context. Navigating synchronously right after
+      // setAuthState races the destination route's own layout mounting before the
+      // new `user` value has propagated, causing it to bounce back to /login.
     } catch (err) {
       const apiErr = err as ApiError;
       setServerError(apiErr.title || 'Sign-in failed. Please try again.');
