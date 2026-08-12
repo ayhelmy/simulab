@@ -5,6 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Spin } from 'antd';
 
+function CenteredSpinner() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Spin size="large" />
+    </div>
+  );
+}
+
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -17,15 +25,8 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router, searchParams]);
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (user) return null;
+  // loading, or already authenticated and mid-redirect — never render blank.
+  if (loading || user) return <CenteredSpinner />;
 
   return <>{children}</>;
 }
@@ -56,7 +57,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           padding: '2rem',
         }}
       >
-        <Suspense>
+        <Suspense fallback={<CenteredSpinner />}>
           <AuthGuard>{children}</AuthGuard>
         </Suspense>
       </div>
