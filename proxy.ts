@@ -1,58 +1,26 @@
 /**
  * Next.js 16 Proxy (formerly Middleware).
- * SRS §4.1 AUTH-03: redirect unauthenticated users to /login.
- * Uses an optimistic check — full token verification happens server-side.
  * File must be named proxy.ts (not middleware.ts) in Next.js 16.
+ *
+ * This used to optimistically redirect unauthenticated users away from
+ * protected routes by checking for a `refreshToken` cookie. That check can
+ * never work: the cookie is set by the backend on its own domain
+ * (railway.app) with no explicit Domain attribute, so it's host-only and
+ * never sent on requests to this frontend's domain (vercel.app) — the
+ * Vercel-side proxy can never see it. The check was always false, so every
+ * navigation to a protected route bounced back to /login regardless of
+ * actual auth state, even for a freshly logged-in user.
+ *
+ * Auth is enforced correctly elsewhere: the API rejects unauthenticated
+ * requests (Bearer token), and the client-side layouts (e.g.
+ * app/(dashboard)/layout.tsx) redirect to /login using the real in-memory
+ * auth state once it's loaded.
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Only these path prefixes require authentication.
-// Everything else (landing page, public sim pages, marketing pages) is open.
-const PROTECTED_PREFIXES = [
-  '/dashboard',
-  '/simulations',
-  '/courses',
-  '/gradebook',
-  '/messages',
-  '/analytics',
-  '/users',
-  '/institutions',
-  '/simulation-catalogs',
-  '/roles',
-  '/settings',
-  '/audit-logs',
-  '/profile',
-];
-
-function isProtected(pathname: string): boolean {
-  return PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + '/'));
-}
-
-export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // Allow public assets and API routes through
-  if (pathname.startsWith('/_next') || pathname.startsWith('/api') || pathname.includes('.')) {
-    return NextResponse.next();
-  }
-
-  // Not a protected route — landing page, auth pages, marketing pages, /sim/... all pass through.
-  if (!isProtected(pathname)) {
-    return NextResponse.next();
-  }
-
-  // Optimistic auth check: refresh cookie presence = likely authenticated.
-  // Actual token validation happens in server components / route handlers.
-  const hasRefreshCookie = request.cookies.has('refreshToken');
-
-  if (!hasRefreshCookie) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
+export function proxy(_request: NextRequest) {
   return NextResponse.next();
 }
 
