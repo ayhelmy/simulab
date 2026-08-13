@@ -19,6 +19,7 @@ import { SimulationSkeletonList } from './SimulationSkeleton';
 import CatalogTreeFilter from './CatalogTreeFilter';
 import type { Simulation } from '@/types';
 import { Typography } from 'antd';
+import PublicHeader from './PublicHeader';
 const { Search } = Input;
 const { Text } = Typography;
 const DIFFICULTY_OPTIONS = [
@@ -342,6 +343,7 @@ export default function CatalogClientPage() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f9f9fa' }}>
+      <PublicHeader />
       <div className="public-catalog-content">
 
 
