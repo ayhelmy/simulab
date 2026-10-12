@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
-import { Layout, Spin, Result, Button } from 'antd';
+import { Suspense, useEffect, useState } from 'react';
+import { Layout, Spin } from 'antd';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import PublicHeader from '@/components/public/PublicHeader';
@@ -15,6 +15,7 @@ import LmsIntegrationSection from './LmsIntegrationSection';
 import InstitutionalCallToAction from './InstitutionalCallToAction';
 import Footer from './Footer';
 import { getHomePageData, type HomePagePayload } from '@/lib/pageContent';
+import { HOME_PAGE_FALLBACK } from '@/lib/homePageFallback';
 
 const HEADER_HEIGHT = 64;
 
@@ -22,37 +23,19 @@ const { Content } = Layout;
 
 function HomeContent() {
   const [data, setData] = useState<HomePagePayload | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    setError(false);
+  useEffect(() => {
+    // Backend unreachable (or not deployed yet) → render the built-in default
+    // content rather than an error screen; the landing page must always load.
     getHomePageData()
       .then(setData)
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
+      .catch(() => setData(HOME_PAGE_FALLBACK));
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-
-  if (loading) {
+  if (!data) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Spin size="large" />
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Result
-          status="error"
-          title="Couldn't load the home page"
-          subTitle="Something went wrong while loading content. Please try again."
-          extra={<Button type="primary" onClick={load}>Retry</Button>}
-        />
       </div>
     );
   }
