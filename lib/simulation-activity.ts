@@ -258,6 +258,24 @@ export async function getSessionClickStats(sessionId: string): Promise<ClickStat
   return res.data ?? { totalClicks: 0, stats: [] };
 }
 
+export interface StepResult {
+  order:      number;
+  label:      string;
+  achieved:   boolean;
+  achievedAt: string | null;
+}
+
+export interface StepBreakdownResult {
+  steps:         StepResult[];
+  overallStatus: 'passed' | 'failed' | null;
+}
+
+/** Per-step pass/fail for a session — which of the simulation's defined steps the student completed, in order. */
+export async function getSessionStepBreakdown(sessionId: string): Promise<StepBreakdownResult> {
+  const res = await api.get<StepBreakdownResult>(`/simulation-activity/${sessionId}/steps`);
+  return res.data ?? { steps: [], overallStatus: null };
+}
+
 /**
  * Flush remaining clicks on page unload using keepalive fetch.
  * Best-effort — silently ignores errors.

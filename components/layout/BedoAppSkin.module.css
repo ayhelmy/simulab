@@ -1,0 +1,696 @@
+/*
+ * BEDO design-system skin for the instructor, teaching-assistant, student and
+ * Super Admin interface. `app/(dashboard)/layout.tsx` puts `.root` on the page
+ * content area for those roles only (together with BEDO_APP_THEME), so the
+ * institution-admin and department-manager pages keep their current look.
+ * The remaining classes are building blocks
+ * used by the role dashboards.
+ * Tokens: BEDO_DESIGN_SYSTEM.md sections 4, 8, 10, 11, 18–21.
+ */
+
+.root {
+  --bedo-primary: #F59324;
+  --bedo-primary-hover: #E07B15;
+  --bedo-primary-50: #FFF8F1;
+  --bedo-primary-100: #FEF3E2;
+  --bedo-primary-300: #FBCE9B;
+  --bedo-primary-400: #F9B46C;
+  --bedo-primary-text: #92400E;
+  --bedo-secondary: #5C98B7;
+  --bedo-secondary-100: #D9E8F0;
+  --bedo-secondary-text: #2F5A70;
+  --bedo-border: #DDDEDF;
+  --bedo-border-strong: #D1D5DB;
+  --bedo-divider: #F3F4F6;
+  --bedo-surface: #FFFFFF;
+  --bedo-surface-muted: #F9FAFB;
+  --bedo-text-primary: #111827;
+  --bedo-text-body: #374151;
+  --bedo-text-secondary: #6B7280;
+  --bedo-text-muted: #9CA3AF;
+  --bedo-shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --bedo-focus-ring: 0 0 0 3px rgba(245, 147, 36, 0.14);
+
+  color: var(--bedo-text-body);
+  font-size: 14px;
+}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+
+.header {
+  background: var(--bedo-surface);
+  border: 1px solid var(--bedo-border);
+  border-radius: 12px;
+  box-shadow: var(--bedo-shadow-xs);
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+/* DashboardHeader sets an inline marginBottom; the panel supplies spacing here. */
+.header > div {
+  margin-bottom: 0 !important;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--bedo-secondary);
+  margin-bottom: 6px;
+}
+
+.header :global(h4.ant-typography) {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--bedo-text-primary);
+}
+
+.header :global(.ant-typography-secondary) {
+  color: var(--bedo-text-secondary);
+  line-height: 1.6;
+}
+
+/* Role badge — brand tints (section 10.3, role badges) */
+.header :global(.ant-tag) {
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  padding: 0 10px;
+  margin: 0;
+}
+
+.header[data-role='student'] :global(.ant-tag) {
+  background: var(--bedo-primary-100);
+  border-color: var(--bedo-primary-300);
+  color: var(--bedo-primary-text);
+}
+
+.header[data-role='instructor'] :global(.ant-tag) {
+  background: #D1FAE5;
+  border-color: #A7F3D0;
+  color: #065F46;
+}
+
+/* Platform roles are technical context — blue, never orange (section 10.1). */
+.header[data-role='super_admin'] :global(.ant-tag) {
+  background: var(--bedo-secondary-100);
+  border-color: #BDD7E5;
+  color: var(--bedo-secondary-text);
+}
+
+/* ── Cards ───────────────────────────────────────────────────────────────── */
+
+.root :global(.ant-card) {
+  background: var(--bedo-surface);
+  border: 1px solid var(--bedo-border);
+  border-radius: 12px;
+  box-shadow: var(--bedo-shadow-xs);
+}
+
+/* Clip only cards whose table runs edge to edge, so ribbons and other
+   overhanging content elsewhere are not cut off. */
+.root :global(.ant-card):has(.flushTable) {
+  overflow: hidden;
+}
+
+.root :global(.ant-card) > :global(.ant-card-head) {
+  min-height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--bedo-divider);
+}
+
+.root :global(.ant-card) :global(.ant-card-head-title) {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--bedo-text-primary);
+}
+
+.root :global(.ant-card) > :global(.ant-card-body) {
+  padding: 16px;
+}
+
+.root :global(.ant-empty-description) {
+  font-size: 14px;
+  color: var(--bedo-text-secondary);
+}
+
+/* ── KPI row ─────────────────────────────────────────────────────────────── */
+
+.kpis :global(.ant-card) {
+  height: 100%;
+}
+
+.kpis :global(.ant-statistic-title) {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--bedo-text-secondary);
+  margin-bottom: 6px;
+}
+
+.kpis :global(.ant-statistic-content) {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  color: var(--bedo-text-primary);
+}
+
+.kpis :global(.ant-statistic-content-suffix) {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bedo-text-secondary);
+}
+
+/* Icon sits in a soft tile tinted from its own accent colour. */
+.kpis :global(.ant-statistic-content-prefix) > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 16px;
+  vertical-align: middle;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.kpis :global(.ant-statistic-content-prefix) {
+  margin-inline-end: 10px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+/* Button colours come from BEDO_APP_THEME (components/layout/bedoAppTheme.ts);
+   only shape and focus are handled here. */
+.root :global(.ant-btn) {
+  border-radius: 8px;
+}
+
+.root :global(.ant-btn:focus-visible) {
+  outline: none;
+  box-shadow: var(--bedo-focus-ring);
+}
+
+/* Quick actions: stacked, full-width buttons in the right rail. */
+.quickActions :global(.ant-space) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  gap: 8px !important;
+}
+
+.quickActions :global(.ant-space-item) {
+  width: 100%;
+}
+
+.quickActions :global(.ant-btn) {
+  width: 100%;
+  height: 40px;
+  justify-content: flex-start;
+}
+
+/* ── Chips ───────────────────────────────────────────────────────────────── */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 1px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  text-transform: capitalize;
+  font-variant-numeric: tabular-nums;
+}
+
+.chipNeutral { background: var(--bedo-divider); color: var(--bedo-text-secondary); border-color: var(--bedo-border); }
+.chipInfo    { background: var(--bedo-secondary-100); color: var(--bedo-secondary-text); border-color: #BDD7E5; }
+.chipPrimary { background: var(--bedo-primary-100); color: var(--bedo-primary-text); border-color: var(--bedo-primary-300); }
+.chipSuccess { background: #D1FAE5; color: #065F46; border-color: #A7F3D0; }
+.chipWarning { background: #FEF3C7; color: #92400E; border-color: #FDE68A; }
+.chipError   { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
+
+/*
+ * Ant Design preset tag colours → BEDO badge palette (section 10.1).
+ * Blue family = technical / info, orange = important, amber = attention,
+ * green = positive, red = negative. Solid (filled) tags are left alone.
+ */
+.root :global(.ant-tag) {
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.root :global(.ant-tag-blue:not(.ant-tag-solid)),
+.root :global(.ant-tag-geekblue:not(.ant-tag-solid)),
+.root :global(.ant-tag-cyan:not(.ant-tag-solid)),
+.root :global(.ant-tag-purple:not(.ant-tag-solid)),
+.root :global(.ant-tag-magenta:not(.ant-tag-solid)),
+.root :global(.ant-tag-processing:not(.ant-tag-solid)) {
+  background: var(--bedo-secondary-100);
+  color: var(--bedo-secondary-text);
+  border-color: #BDD7E5;
+}
+
+.root :global(.ant-tag-orange:not(.ant-tag-solid)),
+.root :global(.ant-tag-volcano:not(.ant-tag-solid)) {
+  background: var(--bedo-primary-100);
+  color: var(--bedo-primary-text);
+  border-color: var(--bedo-primary-300);
+}
+
+.root :global(.ant-tag-gold:not(.ant-tag-solid)),
+.root :global(.ant-tag-yellow:not(.ant-tag-solid)),
+.root :global(.ant-tag-warning:not(.ant-tag-solid)) {
+  background: #FEF3C7;
+  color: #92400E;
+  border-color: #FDE68A;
+}
+
+.root :global(.ant-tag-green:not(.ant-tag-solid)),
+.root :global(.ant-tag-lime:not(.ant-tag-solid)),
+.root :global(.ant-tag-success:not(.ant-tag-solid)) {
+  background: #D1FAE5;
+  color: #065F46;
+  border-color: #A7F3D0;
+}
+
+.root :global(.ant-tag-red:not(.ant-tag-solid)),
+.root :global(.ant-tag-error:not(.ant-tag-solid)) {
+  background: #FEE2E2;
+  color: #991B1B;
+  border-color: #FECACA;
+}
+
+/* Follow-up counts rendered by the shared FollowUpTasksList (antd preset tags). */
+.followUp :global(.ant-tag) {
+  border-radius: 999px;
+  min-width: 28px;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.followUp :global(.ant-tag-red)  { background: #FEE2E2; color: #991B1B; border-color: #FECACA; }
+.followUp :global(.ant-tag-gold) { background: #FEF3C7; color: #92400E; border-color: #FDE68A; }
+.followUp :global(.ant-tag-blue) { background: var(--bedo-secondary-100); color: var(--bedo-secondary-text); border-color: #BDD7E5; }
+
+.followUp :global(.ant-list-item) {
+  padding: 10px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  gap: 12px;
+  color: var(--bedo-text-body);
+  transition: background 0.15s ease;
+}
+
+.followUp :global(.ant-list-item:hover) {
+  background: var(--bedo-surface-muted);
+}
+
+.followUp :global(.ant-list-split .ant-list-item) {
+  border-block-end-color: var(--bedo-divider);
+}
+
+/* ── Lists ───────────────────────────────────────────────────────────────── */
+
+.root :global(.ant-list-split .ant-list-item) {
+  border-block-end: 1px solid var(--bedo-divider);
+}
+
+.root :global(.ant-list-split .ant-list-item:last-child) {
+  border-block-end: none;
+}
+
+.subheading {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--bedo-text-muted);
+}
+
+.attentionList {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bedo-divider);
+}
+
+.attentionList :global(.ant-list-header) {
+  padding-top: 0;
+  border-block-end: none;
+}
+
+.rowTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bedo-text-primary);
+  line-height: 1.4;
+}
+
+.meta {
+  font-size: 13px;
+  color: var(--bedo-text-secondary);
+  line-height: 1.5;
+}
+
+.muted {
+  color: var(--bedo-text-muted);
+}
+
+.stackRow {
+  display: flex !important;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+/* Student course rows: title · progress · action */
+.courseRow {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 200px auto;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 14px 0 !important;
+}
+
+.courseProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.courseProgress :global(.ant-progress) {
+  margin: 0;
+}
+
+.courseProgress :global(.ant-progress-text) {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bedo-text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.courseProgress .chip {
+  align-self: flex-start;
+}
+
+/* ── Stat tiles (gradebook summary) ──────────────────────────────────────── */
+
+.statTile {
+  background: var(--bedo-surface-muted);
+  border: 1px solid var(--bedo-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  height: 100%;
+}
+
+.statLabel {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bedo-text-secondary);
+  margin-bottom: 2px;
+}
+
+.statValue {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--bedo-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Table ───────────────────────────────────────────────────────────────── */
+
+/* The card frames the table; the table runs edge to edge inside it. */
+.flushTable {
+  margin: -16px;
+}
+
+.root :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-thead > tr > th) {
+  background: var(--bedo-surface-muted);
+  color: var(--bedo-text-body);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--bedo-border);
+}
+
+.root :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-thead > tr > th::before) {
+  display: none;
+}
+
+.root :global(.ant-table-wrapper .ant-table.ant-table-small .ant-table-tbody > tr > td) {
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--bedo-text-body);
+  border-bottom: 1px solid var(--bedo-divider);
+}
+
+/* Dedicated list pages use size="middle" (section 18.7) — same header treatment. */
+.root :global(.ant-table-wrapper .ant-table.ant-table-middle .ant-table-thead > tr > th) {
+  background: var(--bedo-surface-muted);
+  color: var(--bedo-text-body);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--bedo-border);
+}
+
+.root :global(.ant-table-wrapper .ant-table.ant-table-middle .ant-table-thead > tr > th::before) {
+  display: none;
+}
+
+.root :global(.ant-table-wrapper .ant-table-tbody > tr:last-child > td) {
+  border-bottom: none;
+}
+
+.root :global(.ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td) {
+  background: var(--bedo-surface-muted);
+}
+
+.root :global(.ant-table-wrapper .ant-table) {
+  border-radius: 0;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mobile card list that replaces the table below 768px (section 21.11). */
+.mobileList {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mobileItem {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--bedo-divider);
+}
+
+.mobileItem:last-child {
+  border-bottom: none;
+}
+
+.mobileItemHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+/* ── Empty / error ───────────────────────────────────────────────────────── */
+
+.panel {
+  background: var(--bedo-surface);
+  border: 1px solid var(--bedo-border);
+  border-radius: 12px;
+  box-shadow: var(--bedo-shadow-xs);
+  padding: 8px 24px;
+}
+
+.root :global(.ant-alert) {
+  border-radius: 8px;
+}
+
+.root :global(.ant-alert-with-description) {
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+/* ── Forms ───────────────────────────────────────────────────────────────── */
+
+.root :global(.ant-form-item-explain-error) {
+  font-size: 12px;
+}
+
+.root :global(.ant-form-item-extra) {
+  font-size: 12px;
+  color: var(--bedo-text-secondary);
+}
+
+/* ── Shared PageHeader (components/common/PageHeader.tsx) ────────────────── */
+
+.root :global(.page-header) {
+  background: var(--bedo-surface);
+  border: 1px solid var(--bedo-border);
+  border-radius: 12px;
+  box-shadow: var(--bedo-shadow-xs);
+  padding: 20px 24px;
+  margin-bottom: 16px !important;
+  align-items: center !important;
+}
+
+.root :global(.page-header h4.ant-typography) {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 2px !important;
+}
+
+.root :global(.page-header .ant-typography-secondary) {
+  font-size: 13px !important;
+  color: var(--bedo-text-secondary);
+}
+
+/* ── Filter bars ─────────────────────────────────────────────────────────── */
+
+.root .filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  background: var(--bedo-surface);
+  border: 1px solid var(--bedo-border);
+  border-radius: 12px;
+  box-shadow: var(--bedo-shadow-xs);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.root .resultCount {
+  display: block;
+  font-size: 13px;
+  color: var(--bedo-text-secondary);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 12px;
+}
+
+/* ── Interactive cards ───────────────────────────────────────────────────── */
+
+.root :global(.ant-card-hoverable) {
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.root :global(.ant-card-hoverable:hover) {
+  transform: translateY(-3px);
+  border-color: var(--bedo-primary-400);
+  box-shadow: 0 10px 32px rgba(245, 147, 36, 0.13);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root :global(.ant-card-hoverable),
+  .root :global(.ant-card-hoverable:hover) {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ── Page headings ───────────────────────────────────────────────────────── */
+
+.root :global(h1.ant-typography),
+.root :global(h2.ant-typography),
+.root :global(h3.ant-typography),
+.root :global(h4.ant-typography) {
+  color: var(--bedo-text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+
+  .desktopOnly {
+    display: none;
+  }
+
+  .mobileList {
+    display: block;
+  }
+
+  .flushTable {
+    margin: 0;
+  }
+
+  .courseRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .courseProgress {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 575px) {
+  .header,
+  .root :global(.page-header) {
+    padding: 16px;
+  }
+
+  .root :global(.page-header h4.ant-typography) {
+    font-size: 18px;
+  }
+
+  .root .filterBar > * {
+    flex: 1 1 100% !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .header :global(h4.ant-typography) {
+    font-size: 18px;
+  }
+
+  /* Two KPI tiles per row on phones instead of one long column. */
+  .kpis :global(.ant-row) > :global(.ant-col) {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  .kpis :global(.ant-card) > :global(.ant-card-body) {
+    padding: 12px;
+  }
+
+  .kpis :global(.ant-statistic-content) {
+    font-size: 20px;
+  }
+
+  .kpis :global(.ant-statistic-content-prefix) > span {
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+
+  .kpis :global(.ant-statistic-title) {
+    font-size: 12px;
+  }
+
+  .panel {
+    padding: 4px 16px;
+  }
+}

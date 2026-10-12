@@ -15,7 +15,7 @@ export default function UnauthorizedPage() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
       <Result
-        icon={<LockOutlined style={{ fontSize: 56, color: '#EF4444' }} />}
+        icon={<LockOutlined style={{ fontSize: 56, color: '#DC2626' }} />}
         status="403"
         title="Access Denied"
         subTitle={

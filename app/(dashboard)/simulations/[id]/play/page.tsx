@@ -22,6 +22,16 @@
  *   - Remaining clicks flushed synchronously before session end
  *   - Best-effort beacon flush on pagehide
  *
+ * FM103 LMS event-contract tracking (WEB-DEVELOPER-GUIDE.md schemaVersion
+ * 2.1, backend `experiments` module) — additive, independent of the click
+ * tracking above:
+ *   - attachFM103Lms listens for the iframe's postMessage envelope
+ *   - every received event is persisted to IndexedDB immediately, then
+ *     flushed to POST /experiments/events on a timer (never dropped on a
+ *     failed delivery — see lib/lms-event-queue.ts)
+ *   - hardcoded to projectId 'FM103' for Phase 1; harmless no-op for any
+ *     other simulation since its Unity build won't emit matching payloads
+ *
  * For direct launch (admin / non-course context): falls back to getSimulationLaunch;
  * no activity session is created.
  */
@@ -40,8 +50,11 @@ import {
   type ClickEvent,
 } from '@/lib/simulation-activity';
 import { getSimulationLaunch } from '@/lib/simulations';
-import { normalizeSecureUrl } from '@/lib/utils';
+import { attachSimulationLms, DEFAULT_CHANNEL, LEGACY_FM103_CHANNEL } from '@/lib/simulation-lms-bridge';
+import { enqueue as enqueueSimulationEvent, startFlushLoop as startSimulationLmsFlushLoop } from '@/lib/simulation-lms-event-queue';
+import type { SimulationEventPayload } from '@/lib/experiments';
 import type { ActivityStartResult, ActivityEndResult } from '@/types';
+import { activityHref } from '@/components/student/studentUi';
 import {
   Button, Spin, Result, Space, Typography, Tag, Tooltip, Statistic, Modal, Alert,
 } from 'antd';
@@ -50,6 +63,7 @@ import {
   ExperimentOutlined, ClockCircleOutlined, ThunderboltOutlined,
   LogoutOutlined, CheckCircleOutlined,
 } from '@ant-design/icons';
+import { normalizeSecureUrl } from '@/lib/utils';
 
 const { Text } = Typography;
 const HEARTBEAT_INTERVAL_MS  = 30_000;
@@ -57,7 +71,7 @@ const CLICK_FLUSH_INTERVAL_MS = 15_000;
 const CLICK_BATCH_SIZE        = 25;
 
 const DIFF_COLOR: Record<string, string> = {
-  beginner: 'green', intermediate: 'orange', advanced: 'red',
+  beginner: 'green', intermediate: 'blue', advanced: 'red',
 };
 
 /** Format elapsed seconds into MM:SS or H:MM:SS */
@@ -162,6 +176,40 @@ export default function SimulationPlayPage({ params }: Props) {
     return () => window.removeEventListener('message', handleMessage);
   }, [flushClicks]);
 
+  // ── Structured simulation LMS event-contract bridge (additive — independent
+  // of the click listener above). Generic across any simulation: the new
+  // channel is validated against this simulation's own build_uuid, while the
+  // legacy channel stays validated against the literal 'FM103' so the one
+  // already-shipped build (which can't be changed retroactively) keeps
+  // working unchanged. Skipped entirely for a build with no build_uuid (a
+  // non-WebGL or pre-tracking simulation has nothing to attach to). ─────────
+  useEffect(() => {
+    if (!launchInfo?.buildUuid || !iframeRef.current) return;
+
+    let buildOrigin: string;
+    try {
+      buildOrigin = new URL(launchInfo.launchUrl, window.location.href).origin;
+    } catch {
+      return; // Unparseable launch URL — nothing to attach to.
+    }
+
+    const detach = attachSimulationLms({
+      frame: iframeRef.current,
+      buildOrigin,
+      channels: [
+        { name: DEFAULT_CHANNEL, expectedProjectId: launchInfo.buildUuid },
+        { name: LEGACY_FM103_CHANNEL, expectedProjectId: 'FM103' },
+      ],
+      onEvent: (payload) => { void enqueueSimulationEvent(payload as unknown as SimulationEventPayload); },
+    });
+    const stopFlushLoop = startSimulationLmsFlushLoop();
+
+    return () => {
+      detach();
+      stopFlushLoop();
+    };
+  }, [launchInfo]);
+
   // ── Load launch info + start session ────────────────────────────────────────
 
   const loadAndStart = useCallback(async () => {
@@ -193,6 +241,7 @@ export default function SimulationPlayPage({ params }: Props) {
           estimatedMinutes: null,
           launchType:       direct.launchType ?? null,
           buildStatus:      direct.buildStatus ?? null,
+          buildUuid:        direct.buildUuid ?? null,
         };
       }
 
@@ -310,8 +359,8 @@ export default function SimulationPlayPage({ params }: Props) {
     setExitModalOpen(false);
   };
 
-  const backHref = courseId ? `/courses/${courseId}/home` : '/simulations';
-  const iframeSrc = launchInfo ? normalizeSecureUrl(launchInfo.launchUrl) : '';
+  // Return to the originating activity in the course workspace.
+  const backHref = courseId ? activityHref(courseId, lessonId) : '/simulations';
 
   // ── States ────────────────────────────────────────────────────────────────────
 
@@ -337,7 +386,7 @@ export default function SimulationPlayPage({ params }: Props) {
   if (errorCode === 400) {
     return (
       <Result
-        icon={<ExperimentOutlined style={{ color: '#F59E0B' }} />}
+        icon={<ExperimentOutlined style={{ color: '#D97706' }} />}
         title="Simulation Not Ready"
         subTitle={error ?? 'The simulation build is not ready yet.'}
         extra={
@@ -376,7 +425,7 @@ export default function SimulationPlayPage({ params }: Props) {
         height: 'calc(100vh - 120px)', gap: 24, padding: '0 24px',
       }}>
         <Result
-          icon={<CheckCircleOutlined style={{ color: '#52C41A', fontSize: 64 }} />}
+          icon={<CheckCircleOutlined style={{ color: '#059669', fontSize: 64 }} />}
           title="Simulation Session Ended"
           subTitle={`You spent ${endResult.formattedDuration} in this simulation.`}
           extra={
@@ -420,7 +469,7 @@ export default function SimulationPlayPage({ params }: Props) {
           </Button>
 
           <Space size={6} style={{ minWidth: 0 }}>
-            <ExperimentOutlined style={{ color: '#7C3AED', fontSize: 16, flexShrink: 0 }} />
+            <ExperimentOutlined style={{ color: '#5C98B7', fontSize: 16, flexShrink: 0 }} />
             <Text
               strong
               style={{
@@ -444,7 +493,7 @@ export default function SimulationPlayPage({ params }: Props) {
               </Tag>
             )}
             {launchInfo.launchType === 'webgl' && (
-              <Tag icon={<ThunderboltOutlined />} color="purple" style={{ fontSize: 11, flexShrink: 0 }}>
+              <Tag icon={<ThunderboltOutlined />} color="blue" style={{ fontSize: 11, flexShrink: 0 }}>
                 Unity WebGL
               </Tag>
             )}
@@ -502,7 +551,7 @@ export default function SimulationPlayPage({ params }: Props) {
       >
         <iframe
           ref={iframeRef}
-          src={iframeSrc}
+          src={normalizeSecureUrl(launchInfo.launchUrl)}
           title={launchInfo.title}
           allow="fullscreen; autoplay; clipboard-read; clipboard-write"
           style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
@@ -524,7 +573,7 @@ export default function SimulationPlayPage({ params }: Props) {
           Your session will be ended and the duration recorded.
           Elapsed time: <strong>{formatElapsed(elapsed)}</strong>.
         </p>
-        <p style={{ color: '#888', fontSize: 13 }}>
+        <p style={{ color: '#6B7280', fontSize: 13 }}>
           Your progress inside Unity is not saved by this action.
         </p>
       </Modal>

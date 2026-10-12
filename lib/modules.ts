@@ -37,6 +37,7 @@ export interface CreateLessonData {
   content?:           Record<string, unknown>;
   simulationId?:      string | null;
   catalogId?:         string | null;
+  quizId?:            string | null;
   estimatedMinutes?:  number | null;
   isRequired?:        boolean;
   isPublished?:       boolean;
@@ -50,6 +51,7 @@ export interface UpdateLessonData {
   content?:           Record<string, unknown>;
   simulationId?:      string | null;
   catalogId?:         string | null;
+  quizId?:            string | null;
   estimatedMinutes?:  number | null;
   isRequired?:        boolean;
   isPublished?:       boolean;

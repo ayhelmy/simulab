@@ -1,21 +1,14 @@
 'use client';
 
-import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, Tag, Button, Typography, Space, Tooltip, Image } from 'antd';
-import {
-  ClockCircleOutlined, ExperimentOutlined, PlayCircleOutlined,
-  LockOutlined, StarOutlined,
-} from '@ant-design/icons';
-import type { Simulation } from '@/types';
+import { ClockCircleOutlined, PlayCircleOutlined, ExperimentOutlined, LockOutlined } from '@ant-design/icons';
+import type { CatalogSimulation } from '@/types';
+import { colors, cardStyle, tint } from '@/components/home/homeTheme';
 
-const { Title, Paragraph, Text } = Typography;
-
-const DIFFICULTY_COLOR: Record<string, string> = {
-  beginner:     '#52c41a',
-  intermediate: '#1677ff',
-  advanced:     '#f5222d',
-};
+interface Props {
+  simulation: CatalogSimulation;
+  isAuthenticated: boolean;
+}
 
 const DIFFICULTY_LABEL: Record<string, string> = {
   beginner:     'Beginner',
@@ -23,145 +16,128 @@ const DIFFICULTY_LABEL: Record<string, string> = {
   advanced:     'Advanced',
 };
 
-interface Props {
-  simulation: Simulation;
-  isAuthenticated: boolean;
-}
-
 export default function SimulationCard({ simulation, isAuthenticated }: Props) {
   const router = useRouter();
-  const isDemo = simulation.visibility === 'demo_public' || simulation.visibility === "demo_and_institution";
+  const isDemo = simulation.visibility === 'demo_public' || simulation.visibility === 'demo_and_institution';
+  const isWebGL = simulation.launchType === 'webgl' || simulation.buildStatus === 'ready';
+  const needsLogin = !isDemo && !isAuthenticated;
 
-  function handleViewDetails() {
+  const goToDetail = () => {
     if (!simulation.id) return;
     router.push(`/sim/${simulation.id}`);
-  }
+  };
 
   return (
-    <Card
-      className="sim-result-card"
-      hoverable
-      onClick={handleViewDetails}
+    <div
       role="article"
       aria-label={simulation.title}
-      styles={{ body: { padding: 0 } }}
+      onClick={goToDetail}
+      className="sim-result-card"
+      style={{ ...cardStyle, overflow: 'hidden', cursor: 'pointer', display: 'flex', flexDirection: 'column', height: '100%' }}
     >
-      <div className="sim-card-inner">
-        {/* Thumbnail */}
-        <div className="sim-card-thumb">
-          {simulation.thumbnailUrl ? (
-            <Image
-              src={simulation.thumbnailUrl}
-              alt={`${simulation.title} preview`}
-              width="100%"
-              height="100%"
-              style={{ objectFit: 'cover' }}
-              preview={false}
-              fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='160'%3E%3Crect width='240' height='160' fill='%23FEF3E2'/%3E%3Ccircle cx='120' cy='70' r='28' fill='%23F59324' opacity='.15'/%3E%3Cpath d='M110 65l20 10-20 10V65z' fill='%23F59324' opacity='.4'/%3E%3C/svg%3E"
-            />
-          ) : (
-            <div className="sim-card-thumb-placeholder" aria-hidden="true">
-              <ExperimentOutlined style={{ fontSize: 36, color: '#F59324', opacity: 0.35 }} />
-            </div>
-          )}
+      {/* Thumbnail */}
+      <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 10', background: colors.bgMuted, flexShrink: 0 }}>
+        {simulation.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- arbitrary CMS/admin-provided URL, not a fixed local asset
+          <img
+            src={simulation.thumbnailUrl}
+            alt={`${simulation.title} preview`}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ExperimentOutlined style={{ fontSize: 36, color: colors.accent, opacity: 0.5 }} />
+          </div>
+        )}
 
-          {isDemo && (
-            <span className="sim-card-demo-badge" aria-label="Demo available">
-              Demo
+        {(isDemo || isWebGL) && (
+          <div style={{ position: 'absolute', top: 10, left: 10, display: 'flex', gap: 6 }}>
+            {isDemo && (
+              <span style={{ background: colors.primary, color: '#fff', fontSize: 10.5, fontWeight: 700, borderRadius: 6, padding: '3px 8px' }}>
+                Public Demo
+              </span>
+            )}
+            {isWebGL && (
+              <span style={{ background: 'rgba(255,255,255,0.92)', color: colors.secondary, fontSize: 10.5, fontWeight: 700, borderRadius: 6, padding: '3px 8px' }}>
+                WebGL
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '16px 18px 18px', display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+          {simulation.discipline && (
+            <span style={{ background: tint(colors.primary, 0.12), color: colors.primary, fontSize: 11.5, fontWeight: 600, borderRadius: 6, padding: '3px 9px' }}>
+              {simulation.discipline}
+            </span>
+          )}
+          <span style={{ background: tint(colors.accent, 0.12), color: colors.accent, fontSize: 11.5, fontWeight: 600, borderRadius: 6, padding: '3px 9px' }}>
+            {DIFFICULTY_LABEL[simulation.difficulty] ?? simulation.difficulty}
+          </span>
+          {simulation.estimatedMinutes != null && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: colors.body, fontSize: 12 }}>
+              <ClockCircleOutlined style={{ fontSize: 11 }} /> {simulation.estimatedMinutes} min
             </span>
           )}
         </div>
 
-        {/* Content */}
-        <div className="sim-card-content">
-          <div className="sim-card-header">
-            <Title level={5} className="sim-card-title" ellipsis={{ rows: 2 }}>
-              {simulation.title}
-            </Title>
+        <h3 style={{ fontSize: 17, fontWeight: 700, color: colors.heading, margin: '0 0 6px' }}>
+          {simulation.title}
+        </h3>
 
-            {simulation.buildStatus === 'ready' || simulation.launchType === 'webgl' ? (
-              <Tooltip title="WebGL Simulation">
-                <span className="sim-card-type-badge">WebGL</span>
-              </Tooltip>
-            ) : null}
-          </div>
+        {simulation.description && (
+          <p style={{
+            fontSize: 13.5, color: colors.body, margin: '0 0 16px', flex: 1,
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {simulation.description}
+          </p>
+        )}
 
-          {simulation.description && (
-            <Paragraph
-              className="sim-card-description"
-              ellipsis={{ rows: 2 }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 'auto', flexWrap: 'wrap'  ,justifyContent: 'space-between'}} onClick={(e) => e.stopPropagation()}>
+          {needsLogin ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!simulation.id) return;
+                router.push(`/login?next=${encodeURIComponent(`/sim/${simulation.id}`)}`);
+              }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: colors.primary, color: '#fff', border: 'none',
+                borderRadius: 8, padding: '8px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+              }}
             >
-              {simulation.description}
-            </Paragraph>
+              <LockOutlined /> Login to Access
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={goToDetail}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: colors.primary, color: '#fff', border: 'none',
+                borderRadius: 8, padding: '8px 16px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <PlayCircleOutlined /> Preview Simulation
+            </button>
           )}
-
-          {/* Learning objectives preview */}
-          {simulation.learningObjectives?.length > 0 && (
-            <Text className="sim-card-objectives">
-              <StarOutlined style={{ marginRight: 4, color: '#D97706' }} />
-              {simulation.learningObjectives.slice(0, 2).join(' · ')}
-            </Text>
-          )}
-
-          {/* Meta tags */}
-          <div className="sim-card-tags">
-            {simulation.estimatedMinutes && (
-              <Tag icon={<ClockCircleOutlined />} className="sim-tag-meta">
-                {simulation.estimatedMinutes} min
-              </Tag>
-            )}
-
-            <Tag
-              color={DIFFICULTY_COLOR[simulation.difficulty] ?? '#1677ff'}
-              className="sim-tag-difficulty"
-            >
-              {DIFFICULTY_LABEL[simulation.difficulty] ?? simulation.difficulty}
-            </Tag>
-
-            {simulation.visibility === 'demo_public' && (
-              <Tag color="#F59324" className="sim-tag-visibility">
-                Public Demo
-              </Tag>
-            )}
-          </div>
-
-          {/* Actions */}
-          <div className="sim-card-actions" onClick={(e) => e.stopPropagation()}>
-            <Button
-              size="small"
-              onClick={handleViewDetails}
-              className="sim-btn-details"
-            >
-              View Details
-            </Button>
-
-            {isDemo ? (
-              <Button
-                size="small"
-                type="primary"
-                icon={<PlayCircleOutlined />}
-                onClick={(e) => { e.stopPropagation(); handleViewDetails(); }}
-                className="sim-btn-demo"
-              >
-                Preview
-              </Button>
-            ) : !isAuthenticated ? (
-              <Button
-                size="small"
-                icon={<LockOutlined />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!simulation.id) return;
-                  router.push(`/login?next=${encodeURIComponent(`/sim/${simulation.id}`)}`);
-                }}
-                className="sim-btn-login"
-              >
-                Login to Access
-              </Button>
-            ) : null}
-          </div>
+          <button
+            type="button"
+            onClick={goToDetail}
+            style={{
+              background: '#fff', color: colors.heading, border: `1px solid ${colors.border}`,
+              borderRadius: 8, padding: '8px 14px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Details ›
+          </button>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

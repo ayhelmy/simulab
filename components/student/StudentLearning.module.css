@@ -1,0 +1,3871 @@
+/*
+ * Student learning flow — dashboard, course catalog, course detail, course home
+ * (lesson + contents sidebar) and quiz attempt. Tokens from BEDO_DESIGN_SYSTEM.md
+ * sections 4 (colour), 8 (radius/border/shadow), 10 (badges), 11 (cards),
+ * 18–19 (authenticated + student patterns) and 26 (responsive).
+ *
+ * Tokens are declared on `.page` rather than inherited from BedoAppSkin, because
+ * the course pages are also opened by admin roles that don't get the skin.
+ */
+
+.page {
+  --sl-primary: #F59324;
+  --sl-primary-hover: #E07B15;
+  --sl-primary-50: #FFF8F1;
+  --sl-primary-100: #FEF3E2;
+  --sl-primary-300: #FBCE9B;
+  --sl-primary-400: #F9B46C;
+  --sl-primary-text: #92400E;
+  --sl-secondary: #5C98B7;
+  --sl-secondary-50: #EDF4F8;
+  --sl-secondary-100: #D9E8F0;
+  --sl-secondary-200: #A8D2E7;
+  --sl-secondary-text: #2F5A70;
+  --sl-border: #DDDEDF;
+  --sl-border-strong: #D1D5DB;
+  --sl-divider: #F3F4F6;
+  --sl-surface: #FFFFFF;
+  --sl-surface-muted: #F9FAFB;
+  --sl-text-primary: #111827;
+  --sl-text-body: #374151;
+  --sl-text-secondary: #6B7280;
+  --sl-text-muted: #9CA3AF;
+  --sl-success: #059669;
+  --sl-success-text: #065F46;
+  --sl-success-bg: #D1FAE5;
+  --sl-success-border: #A7F3D0;
+  --sl-warning-text: #92400E;
+  --sl-warning-bg: #FEF3C7;
+  --sl-warning-border: #FDE68A;
+  --sl-error: #DC2626;
+  --sl-error-text: #991B1B;
+  --sl-error-bg: #FEE2E2;
+  --sl-error-border: #FECACA;
+  --sl-shadow-xs: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --sl-focus-ring: 0 0 0 3px rgba(245, 147, 36, 0.14);
+
+  color: var(--sl-text-body);
+}
+
+.page :focus-visible {
+  outline: none;
+  box-shadow: var(--sl-focus-ring);
+}
+
+/* ── Primitives ──────────────────────────────────────────────────────────── */
+
+.panel {
+  background: var(--sl-surface);
+  border: 1px solid var(--sl-border);
+  border-radius: 12px;
+  box-shadow: var(--sl-shadow-xs);
+}
+
+.panelBody {
+  padding: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sl-text-primary);
+}
+
+.eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sl-secondary);
+}
+
+.title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--sl-text-primary);
+}
+
+.meta {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-text-secondary);
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot::before {
+  content: '·';
+  margin: 0 5px 0 0;
+  color: var(--sl-text-muted);
+}
+
+/* Badges — section 10.1 colour rule. Always a word, never a bare colour. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip :global(.anticon) {
+  font-size: 11px;
+}
+
+.chipNeutral { background: var(--sl-divider); color: var(--sl-text-secondary); border-color: var(--sl-border); }
+.chipInfo    { background: var(--sl-secondary-100); color: var(--sl-secondary-text); border-color: var(--sl-secondary-200); }
+.chipPrimary { background: var(--sl-primary-100); color: var(--sl-primary-text); border-color: var(--sl-primary-300); }
+.chipSuccess { background: var(--sl-success-bg); color: var(--sl-success-text); border-color: var(--sl-success-border); }
+.chipWarning { background: var(--sl-warning-bg); color: var(--sl-warning-text); border-color: var(--sl-warning-border); }
+.chipError   { background: var(--sl-error-bg); color: var(--sl-error-text); border-color: var(--sl-error-border); }
+
+/* Slim progress bar — 6px, radius pill (section 19.3). */
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.progressTrack {
+  flex: 1;
+  height: 6px;
+  min-width: 60px;
+  border-radius: 999px;
+  background: var(--sl-divider);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sl-secondary);
+  transition: width 0.3s ease;
+}
+
+.progressFillDone {
+  background: var(--sl-success);
+}
+
+.progressLabel {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Detail chip (section 4.8) — label/value tile used for metadata grids. */
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.fact {
+  background: var(--sl-surface-muted);
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 0;
+}
+
+.factLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sl-text-secondary);
+  margin-bottom: 2px;
+}
+
+.factValue {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.emptyNote {
+  padding: 24px 8px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--sl-text-secondary);
+}
+
+/* ── Student dashboard ───────────────────────────────────────────────────── */
+
+.continueCard {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px 20px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  border-left: 4px solid var(--sl-primary);
+}
+
+.continueIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--sl-primary-100);
+  color: var(--sl-primary);
+  font-size: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.continueTitle {
+  margin: 2px 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sl-text-primary);
+}
+
+.continueProgress {
+  max-width: 420px;
+  margin-top: 10px;
+}
+
+.continueNext {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  font-size: 13px;
+  color: var(--sl-text-body);
+}
+
+.continueAction {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Compact stats strip — supports the page, doesn't lead it (section 19.1). */
+.statStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--sl-divider);
+  border-bottom: 1px solid var(--sl-divider);
+  min-width: 0;
+  margin: 0 -1px -1px 0;
+}
+
+.statIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.statValue {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.statUnit {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-text-secondary);
+  margin-left: 2px;
+}
+
+.statLabel {
+  display: block;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--sl-text-secondary);
+}
+
+/* Section card header (title + helper + action). */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sl-divider);
+  flex-wrap: wrap;
+}
+
+.sectionHelper {
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px;
+}
+
+.courseRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr) 96px auto;
+  align-items: center;
+  gap: 8px 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--sl-divider);
+}
+
+.courseRow:last-child,
+.todoRow:last-child {
+  border-bottom: none;
+}
+
+.rowTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sl-text-primary);
+}
+
+.gradeValue {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.gradeLabel {
+  display: block;
+  font-size: 11px;
+  color: var(--sl-text-secondary);
+}
+
+.todoRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--sl-divider);
+}
+
+.todoIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--sl-primary-100);
+  color: var(--sl-primary);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Course catalog ──────────────────────────────────────────────────────── */
+
+.tabs {
+  margin-bottom: 4px;
+}
+
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 16px;
+}
+
+.tabCount {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--sl-divider);
+  color: var(--sl-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.courseCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.courseCard:hover {
+  transform: translateY(-3px);
+  border-color: var(--sl-primary-400);
+  box-shadow: 0 10px 32px rgba(245, 147, 36, 0.13);
+}
+
+.courseThumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C6 100%) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 36px;
+  flex-shrink: 0;
+}
+
+.thumbBadge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.courseBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  min-height: 0;
+}
+
+.courseTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sl-text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.courseTitle a {
+  color: inherit;
+}
+
+.courseTitle a:hover {
+  color: var(--sl-primary-hover);
+}
+
+.clamp2 {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.cardFooter {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Course detail ───────────────────────────────────────────────────────── */
+
+.detailHeader {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.detailThumb {
+  width: 168px;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C6 100%) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 36px;
+}
+
+.detailDesc {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--sl-text-body);
+}
+
+.detailProgress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.detailProgress .progress {
+  flex: 1 1 260px;
+  max-width: 440px;
+}
+
+.moduleList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.module {
+  border: 1px solid var(--sl-border);
+  border-radius: 12px;
+  background: var(--sl-surface);
+  overflow: hidden;
+}
+
+.moduleLocked {
+  background: var(--sl-surface-muted);
+}
+
+.moduleHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.moduleHead:hover {
+  background: var(--sl-surface-muted);
+}
+
+.moduleIndex {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--sl-secondary-50);
+  color: var(--sl-secondary-text);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.moduleIndexDone {
+  background: var(--sl-success-bg);
+  color: var(--sl-success-text);
+}
+
+.moduleIndexLocked {
+  background: var(--sl-divider);
+  color: var(--sl-text-muted);
+}
+
+.moduleTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.moduleLocked .moduleTitle {
+  color: var(--sl-text-secondary);
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--sl-text-muted);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.lessonList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.lessonRow {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sl-divider);
+  border-left: 3px solid transparent;
+}
+
+.lessonRow:last-child {
+  border-bottom: none;
+}
+
+.lessonTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sl-text-primary);
+  line-height: 1.4;
+}
+
+.lessonDone .lessonTitle {
+  color: var(--sl-text-body);
+}
+
+.lessonCurrent {
+  background: var(--sl-primary-50);
+  border-left-color: var(--sl-primary);
+}
+
+.lessonCurrent .lessonTitle {
+  font-weight: 600;
+}
+
+.lessonLocked {
+  color: var(--sl-text-muted);
+}
+
+.lessonLocked .lessonTitle {
+  color: var(--sl-text-muted);
+}
+
+.lessonStateIcon {
+  font-size: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.lessonAside {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.lockNote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--sl-divider);
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+  background: var(--sl-surface-muted);
+}
+
+/* ── Course home: header, lesson and activity cards ─────────────────────── */
+
+.homeHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.homeHeaderMain {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.homeHeaderMain .progress {
+  max-width: 440px;
+  margin-top: 8px;
+}
+
+.homeHeaderActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lessonHeader {
+  padding: 16px 20px;
+  margin-bottom: 12px;
+}
+
+.lessonHeaderTitle {
+  margin: 4px 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sl-text-primary);
+}
+
+.activityCard {
+  padding: 20px;
+  margin-bottom: 12px;
+}
+
+.activityCardQuiz {
+  border-top: 3px solid var(--sl-border-strong);
+}
+
+.activityCardSim {
+  border-top: 3px solid var(--sl-secondary);
+}
+
+.activityHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.activityIcon {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.activityIconQuiz { background: var(--sl-divider); color: var(--sl-text-secondary); }
+.activityIconSim  { background: var(--sl-secondary-100); color: var(--sl-secondary); }
+
+.activityTitle {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--sl-text-primary);
+}
+
+.resultPanel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--sl-border);
+  background: var(--sl-surface-muted);
+}
+
+.resultPass { background: var(--sl-surface); border-color: var(--sl-success-border); border-left: 3px solid var(--sl-success); }
+.resultFail { background: var(--sl-surface); border-color: var(--sl-error-border); border-left: 3px solid var(--sl-error); }
+.resultInfo { background: var(--sl-secondary-50); border-color: var(--sl-secondary-100); }
+
+.resultScore {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 16px;
+}
+
+.actionHint {
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+}
+
+.lessonNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--sl-surface-muted);
+}
+
+/* Lesson content card */
+.contentCard {
+  padding: 20px 24px;
+  margin-bottom: 12px;
+}
+
+/* Sections divider between content / simulation / quiz blocks */
+.blockLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-text-secondary);
+}
+
+.blockLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sl-border);
+}
+
+/* ── Course contents sidebar ─────────────────────────────────────────────── */
+
+.tree {
+  position: sticky;
+  top: 76px;
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.treeHead {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--sl-divider);
+}
+
+.treeHead .progress {
+  margin-top: 8px;
+}
+
+.treeScroll {
+  overflow-y: auto;
+  padding: 8px 6px;
+}
+
+.treeModule + .treeModule {
+  margin-top: 4px;
+}
+
+.treeModuleHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--sl-text-primary);
+}
+
+.treeModuleHead:hover {
+  background: var(--sl-surface-muted);
+}
+
+.treeModuleTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.treeModuleLocked .treeModuleTitle,
+.treeModuleLocked .treeModuleCount {
+  color: var(--sl-text-muted);
+}
+
+.treeModuleCount {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sl-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.treeModuleBar {
+  height: 3px;
+  margin: 0 8px 6px 34px;
+  border-radius: 999px;
+  background: var(--sl-divider);
+  overflow: hidden;
+}
+
+.treeLessons {
+  list-style: none;
+  margin: 0 0 6px;
+  padding: 0;
+}
+
+.treeLesson {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 6px 7px 8px;
+  margin: 1px 0;
+  border: none;
+  border-left: 3px solid transparent;
+  border-radius: 0 8px 8px 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--sl-text-body);
+  transition: background 0.15s ease;
+}
+
+.treeLesson:hover:not(:disabled) {
+  background: var(--sl-surface-muted);
+}
+
+.treeLesson:disabled {
+  cursor: not-allowed;
+}
+
+.treeLessonCurrent,
+.treeLessonCurrent:hover:not(:disabled) {
+  background: var(--sl-primary-50);
+  border-left-color: var(--sl-primary);
+}
+
+.treeLessonIcon {
+  flex-shrink: 0;
+  width: 18px;
+  padding-top: 1px;
+  font-size: 14px;
+  display: flex;
+  justify-content: center;
+}
+
+.treeLessonText {
+  flex: 1;
+  min-width: 0;
+}
+
+.treeLessonTitle {
+  display: block;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--sl-text-primary);
+}
+
+.treeLessonCurrent .treeLessonTitle {
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.treeLessonDone .treeLessonTitle {
+  color: var(--sl-text-body);
+}
+
+.treeLessonLocked .treeLessonTitle,
+.treeLessonLocked .treeLessonMeta {
+  color: var(--sl-text-muted);
+}
+
+.treeLessonMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 6px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--sl-text-secondary);
+}
+
+.treeRequired {
+  color: var(--sl-text-secondary);
+  font-weight: 600;
+}
+
+.treeNowLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-primary);
+}
+
+/* Contents toggle only exists where the sidebar is hidden (below lg). */
+.contentsToggle {
+  display: none !important;
+}
+
+/* ── Quiz attempt ────────────────────────────────────────────────────────── */
+
+.quizShell {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.quizHeader {
+  position: sticky;
+  top: 72px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.quizHeaderTitle {
+  margin: 2px 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--sl-text-primary);
+}
+
+.quizHeaderSide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--sl-border);
+  background: var(--sl-surface-muted);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.timerLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sl-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.timerLow {
+  border-color: var(--sl-error-border);
+  background: var(--sl-error-bg);
+  color: var(--sl-error-text);
+}
+
+.saveState {
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.questionCard {
+  padding: 20px 24px;
+  margin-bottom: 12px;
+}
+
+.questionAnswered {
+  border-left: 3px solid var(--sl-success);
+}
+
+.questionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.questionNumber {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sl-secondary-text);
+}
+
+.questionPrompt {
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--sl-text-primary);
+}
+
+/* Large, readable answer options: each option is a full-width bordered row. */
+.options :global(.ant-radio-group),
+.options :global(.ant-checkbox-group) {
+  width: 100%;
+}
+
+.options :global(.ant-space) {
+  width: 100%;
+  gap: 8px !important;
+}
+
+.options :global(.ant-space-item) {
+  width: 100%;
+}
+
+.options :global(.ant-radio-wrapper),
+.options :global(.ant-checkbox-wrapper) {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+  background: var(--sl-surface);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--sl-text-body);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.options :global(.ant-radio-wrapper:hover),
+.options :global(.ant-checkbox-wrapper:hover) {
+  border-color: var(--sl-primary-400);
+}
+
+.options :global(.ant-radio-wrapper-checked),
+.options :global(.ant-checkbox-wrapper-checked) {
+  border-color: var(--sl-primary);
+  background: var(--sl-primary-50);
+  color: var(--sl-text-primary);
+}
+
+.options :global(.ant-input),
+.options :global(.ant-input-number),
+.options :global(.ant-select-selector) {
+  font-size: 15px;
+}
+
+.submitBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 16px 20px;
+  background: var(--sl-surface-muted);
+}
+
+.submitSummary {
+  font-size: 14px;
+  color: var(--sl-text-body);
+}
+
+.submitSummary strong {
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.resultCard {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.resultStats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 20px 0 24px;
+}
+
+.resultStats .fact {
+  min-width: 140px;
+  text-align: left;
+}
+
+/* ── Responsive (section 26) ─────────────────────────────────────────────── */
+
+@media (max-width: 991px) {
+  .contentsToggle {
+    display: inline-flex !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .continueCard {
+    grid-template-columns: 44px minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .continueIcon {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+  }
+
+  .continueAction {
+    grid-column: 1 / -1;
+    align-items: stretch;
+  }
+
+  .continueAction :global(.ant-btn) {
+    width: 100%;
+  }
+
+  .courseRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .courseRow > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .courseRow > :nth-child(3) {
+    grid-row: 1;
+    grid-column: 2;
+    text-align: right;
+  }
+
+  .courseRow > :nth-child(4) {
+    grid-column: 1 / -1;
+  }
+
+  .courseRow > :nth-child(4) :global(.ant-btn) {
+    width: 100%;
+  }
+
+  .detailHeader {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .detailThumb {
+    width: 100%;
+    max-height: 160px;
+    aspect-ratio: auto;
+    height: 140px;
+  }
+
+  .lessonRow {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .lessonAside {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .quizHeader {
+    grid-template-columns: minmax(0, 1fr);
+    top: 60px;
+    padding: 12px 16px;
+  }
+
+  .quizHeaderSide {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .questionCard,
+  .contentCard {
+    padding: 16px;
+  }
+
+  .submitBar :global(.ant-btn) {
+    width: 100%;
+  }
+}
+
+@media (max-width: 575px) {
+  .statStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .todoRow {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .todoRow > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .todoRow > :last-child :global(.ant-btn) {
+    width: 100%;
+  }
+
+  .homeHeaderActions {
+    width: 100%;
+  }
+
+  .homeHeaderActions :global(.ant-btn) {
+    flex: 1;
+  }
+
+  .actionRow :global(.ant-btn) {
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .courseCard,
+  .courseCard:hover {
+    transition: none;
+    transform: none;
+  }
+
+  .progressFill,
+  .chevron {
+    transition: none;
+  }
+}
+
+/* ── Interactive simulation viewport (lesson page) ───────────────────────────
+ * A browser/WebGL window frame around the simulation screenshot — deliberately
+ * no play button or timeline, so it never reads as a video. */
+
+.simViewport {
+  border: 1px solid var(--sl-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--sl-surface);
+  margin-bottom: 16px;
+}
+
+.simChrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--sl-surface-muted);
+  border-bottom: 1px solid var(--sl-border);
+}
+
+.simDots {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.simDots span {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--sl-border-strong);
+}
+
+.simAddress {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: var(--sl-surface);
+  border: 1px solid var(--sl-border);
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.simScreen {
+  position: relative;
+  aspect-ratio: 16 / 7;
+  min-height: 150px;
+  background:
+    linear-gradient(var(--sl-secondary-50) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--sl-secondary-50) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--sl-surface-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-secondary);
+  font-size: 44px;
+}
+
+.simScreenImage {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.simScreenLabels {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.simScreenLabels > span {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.simIntro {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sl-text-body);
+}
+
+@media (max-width: 575px) {
+  .simScreen {
+    aspect-ratio: 16 / 9;
+  }
+}
+
+/* ── Simulation Path Overview (course detail) ─────────────────────────────── */
+
+.pathHero {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 24px;
+  padding: 24px;
+  margin-bottom: 16px;
+}
+
+.pathHeroThumb {
+  width: 220px;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  border: 1px solid var(--sl-border);
+  background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C6 100%) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 40px;
+}
+
+.pathHeroTitle {
+  margin: 4px 0 6px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--sl-text-primary);
+}
+
+.pathHeroProgress {
+  max-width: 520px;
+  margin-top: 16px;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.summaryTile {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.summaryLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  margin-bottom: 2px;
+}
+
+.summaryValue {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--sl-text-primary);
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.mainSim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px;
+  margin-bottom: 16px;
+  border-top: 3px solid var(--sl-secondary);
+  background: linear-gradient(180deg, var(--sl-secondary-50) 0, var(--sl-surface) 120px);
+}
+
+.mainSim .simViewport {
+  margin-bottom: 0;
+  align-self: start;
+}
+
+.mainSimTitle {
+  margin: 2px 0 8px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sl-text-primary);
+}
+
+.section {
+  margin-bottom: 16px;
+}
+
+.sectionIntro {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+}
+
+.learnGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.learnCard {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--sl-border);
+  border-radius: 10px;
+  background: var(--sl-surface);
+}
+
+.learnIcon {
+  flex-shrink: 0;
+  color: var(--sl-primary);
+  font-size: 16px;
+  padding-top: 2px;
+}
+
+.learnTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  line-height: 1.4;
+}
+
+.moduleBar {
+  height: 4px;
+  margin: 0 14px 12px 52px;
+  border-radius: 999px;
+  background: var(--sl-divider);
+  overflow: hidden;
+}
+
+.reqList {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.reqItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--sl-border);
+  border-radius: 10px;
+  background: var(--sl-surface-muted);
+}
+
+.reqItemDone {
+  background: var(--sl-surface);
+  border-color: var(--sl-success-border);
+}
+
+.accessStats {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--sl-surface-muted);
+  border: 1px solid var(--sl-border);
+}
+
+.accessRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+}
+
+.accessRow strong {
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.dropLink {
+  display: block;
+  margin: 8px auto 0;
+  color: var(--sl-text-secondary) !important;
+  font-weight: 500 !important;
+}
+
+.factGridCompact {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.observeList {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+  background: var(--sl-surface-muted);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 6px 16px;
+}
+
+.observeList li {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-text-body);
+}
+
+.chipSm {
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 991px) {
+  .mainSim {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  .pathHero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .pathHeroThumb {
+    width: 100%;
+    aspect-ratio: auto;
+    height: 150px;
+  }
+
+  .pathHeroTitle {
+    font-size: 20px;
+  }
+
+  .heroActions :global(.ant-btn) {
+    flex: 1 1 100%;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .moduleBar {
+    margin-left: 14px;
+  }
+}
+
+/* ── Course Overview (calmer layout) ──────────────────────────────────────── */
+
+.courseHero {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 20px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+}
+
+.courseHeroThumb {
+  width: 160px;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  border: 1px solid var(--sl-border);
+  background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C6 100%) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 34px;
+}
+
+.heroFooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 24px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.heroFooter .progress {
+  flex: 1 1 280px;
+  max-width: 460px;
+}
+
+.heroFooter .heroActions {
+  margin-top: 0;
+}
+
+/* Compact main simulation card: small preview + short body. */
+.simCompact {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--sl-secondary);
+}
+
+.simCompact .simViewport {
+  margin: 0;
+}
+
+.simCompact .simChrome {
+  padding: 5px 8px;
+  gap: 6px;
+}
+
+.simCompact .simDots span {
+  width: 7px;
+  height: 7px;
+}
+
+.simCompact .simScreen {
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  font-size: 30px;
+}
+
+.simCompactTitle {
+  margin: 2px 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sl-text-primary);
+}
+
+.simCompact .actionRow {
+  margin-top: 12px;
+}
+
+.conceptRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.concept {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sl-border);
+  background: var(--sl-surface-muted);
+  font-size: 13px;
+  color: var(--sl-text-body);
+}
+
+.conceptSim {
+  background: var(--sl-secondary-50);
+  border-color: var(--sl-secondary-100);
+  color: var(--sl-secondary-text);
+}
+
+/* Sidebar lists */
+.sideList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.sideItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--sl-text-body);
+}
+
+.sideItem > :first-child {
+  flex-shrink: 0;
+  font-size: 15px;
+  padding-top: 1px;
+}
+
+.sideItemBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.sideCount {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sideNote {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--sl-divider);
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+}
+
+/* Collapsible sidebar card (Course Details). */
+.collapsible {
+  margin-bottom: 16px;
+}
+
+.collapsible > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.collapsible[open] > summary {
+  border-bottom: 1px solid var(--sl-divider);
+}
+
+.collapsible[open] .chevron {
+  transform: rotate(90deg);
+}
+
+.detailList {
+  margin: 0;
+  padding: 12px 16px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+  font-size: 13px;
+}
+
+.detailList dt {
+  color: var(--sl-text-secondary);
+}
+
+.detailList dd {
+  margin: 0;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  text-align: right;
+}
+
+@media (max-width: 767px) {
+  .courseHero {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 16px;
+  }
+
+  .courseHeroThumb {
+    width: 100%;
+    aspect-ratio: auto;
+    height: 120px;
+  }
+
+  .simCompact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767px) {
+  /* Link-wrapped buttons stretch like plain ones when hero actions stack. */
+  .heroActions > a {
+    flex: 1 1 100%;
+  }
+
+  .heroActions > a :global(.ant-btn) {
+    width: 100%;
+  }
+
+  .simCompact .simScreen {
+    aspect-ratio: 16 / 6;
+  }
+}
+
+/* ── Single-column Course Overview ────────────────────────────────────────── */
+
+.heroNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+  flex-basis: 100%;
+}
+
+.heroDrop {
+  align-self: center;
+  color: var(--sl-text-secondary) !important;
+  font-weight: 500 !important;
+}
+
+.upNext {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--sl-primary);
+}
+
+.upNextIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--sl-primary-100);
+  color: var(--sl-primary);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.manageRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+@media (max-width: 767px) {
+  .upNext {
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding: 14px 16px;
+  }
+
+  .upNext > a {
+    grid-column: 1 / -1;
+  }
+
+  .upNext > a :global(.ant-btn) {
+    width: 100%;
+  }
+}
+
+/* ── Course Overview with compact right rail ──────────────────────────────── */
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'hero' 'rail' 'main';
+  gap: 16px;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+.areaHero { grid-area: hero; margin-bottom: 0; }
+.areaRail { grid-area: rail; }
+.areaMain { grid-area: main; min-width: 0; }
+
+/* Desktop: rail beside the content, sticky while scrolling Course Contents. */
+@media (min-width: 1200px) {
+  .overviewGrid {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    grid-template-areas: 'hero rail' 'main rail';
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+
+  .areaRail {
+    position: sticky;
+    top: 76px;
+  }
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tablet: rail cards sit two-up under the hero instead of one long stack. */
+@media (min-width: 768px) and (max-width: 1199px) {
+  .rail {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    align-items: start;
+  }
+
+  .railAccordion {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Hero actions take the full row once the hero stacks. */
+  .heroFooter .heroActions {
+    flex: 1 1 100%;
+  }
+}
+
+.railCard {
+  padding: 14px 16px;
+}
+
+.railTitle {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sl-text-secondary);
+}
+
+.railUpNext {
+  border-left: 3px solid var(--sl-primary);
+}
+
+.railList {
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  font-size: 13px;
+}
+
+.railList dt {
+  color: var(--sl-text-secondary);
+}
+
+.railList dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  overflow-wrap: anywhere;
+}
+
+.railActions {
+  display: grid;
+  gap: 8px;
+}
+
+.railAccordion {
+  margin-bottom: 0;
+}
+
+.railAccordion > summary {
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+/* Rail buttons wrap rather than overflow when the rail cards are narrow. */
+.railActions :global(.ant-btn),
+.railUpNext :global(.ant-btn) {
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  padding-block: 4px;
+}
+
+/* ── Calm single-column Course Overview ───────────────────────────────────── */
+
+.calm {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calm > * {
+  margin-bottom: 0 !important;
+}
+
+/* Tiny, quiet concept chips inside the main simulation card. */
+.conceptMini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.conceptMini > span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--sl-surface-muted);
+  border: 1px solid var(--sl-divider);
+  font-size: 11px;
+  color: var(--sl-text-secondary);
+}
+
+/* Course Contents without an outer box — the modules are the cards. */
+.contents {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  scroll-margin-top: 76px;
+}
+
+.contentsHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 4px 4px 0;
+}
+
+.contentsHead .sectionTitle {
+  font-size: 17px;
+}
+
+.moduleCalm {
+  box-shadow: var(--sl-shadow-xs);
+}
+
+.accordions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.accordions .collapsible {
+  margin-bottom: 0;
+}
+
+.detailFooter {
+  padding: 0 16px 12px;
+  border-top: 1px solid var(--sl-divider);
+  padding-top: 8px;
+}
+
+.detailFooter .heroDrop {
+  padding-left: 0;
+}
+
+/* ── Course Overview: main ~70% + small rail ~30% ─────────────────────────── */
+
+.overviewSplit {
+  max-width: 1280px;
+}
+
+@media (min-width: 1200px) {
+  .overviewSplit {
+    grid-template-columns: minmax(0, 7fr) minmax(280px, 3fr);
+    column-gap: 20px;
+    row-gap: 20px;
+  }
+}
+
+.mainStack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.mainStack > * {
+  margin-bottom: 0 !important;
+}
+
+/* ── Instructor workspace ─────────────────────────────────────────────────── */
+
+/* Dashboard header actions */
+.teachActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.todoClear {
+  opacity: 0.65;
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Course overview (manager) */
+.managerFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+}
+
+.managerFacts strong {
+  color: var(--sl-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.managerActions {
+  gap: 8px 10px;
+}
+
+/* Edit course: sticky action bar, grouped sections */
+.editBar {
+  position: sticky;
+  top: 72px;
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  padding: 14px 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.editBarActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.editTabs :global(.ant-tabs-nav) {
+  margin-bottom: 16px;
+}
+
+.editTabs :global(.ant-tabs-tab) {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 4px;
+}
+
+.editGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+}
+
+.editMain {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.editSide {
+  position: sticky;
+  top: 160px;
+}
+
+.formSection {
+  padding: 18px 20px 4px;
+}
+
+.formSectionTitle {
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sl-divider);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sl-text-primary);
+}
+
+.editSide .formSection {
+  padding-bottom: 16px;
+}
+
+.thumbField {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.thumbPreview {
+  flex-shrink: 0;
+  width: 160px;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  border: 1px solid var(--sl-border);
+  background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C6 100%) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 28px;
+}
+
+.formFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+/* Builder */
+.builderHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.builderRow {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  background: var(--sl-surface-muted);
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+}
+
+@media (max-width: 991px) {
+  .editGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editSide {
+    position: static;
+  }
+}
+
+@media (max-width: 767px) {
+  .editBar {
+    top: 60px;
+    padding: 12px 16px;
+  }
+
+  .editBarActions {
+    width: 100%;
+  }
+
+  .thumbField {
+    flex-direction: column;
+  }
+
+  .builderRow {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .builderRow .rowActions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+/* ── Course workspace: URL-driven selection, locked state, up next ───────────
+ * Added with the post-LMS audit fixes. Orange is limited to the primary button
+ * and the "Now viewing" accent; "Up next" uses blue, "Required" stays gray.
+ */
+
+/* Header progress duplicates Course Contents on desktop; keep it for the drawer layout. */
+@media (min-width: 992px) {
+  .homeHeaderProgress {
+    display: none;
+  }
+}
+
+.treeUpNextLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sl-secondary-text);
+}
+
+.treeDoneText {
+  color: var(--sl-success-text);
+  font-weight: 600;
+}
+
+.lockedPanel {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  margin-bottom: 16px;
+  background: var(--sl-surface-muted);
+}
+
+.lockedIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--sl-divider);
+  border: 1px solid var(--sl-border);
+  color: var(--sl-text-muted);
+  font-size: 18px;
+}
+
+.lockedTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.upNextBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  border-left: 3px solid var(--sl-secondary);
+}
+
+.upNextBarLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sl-secondary-text);
+}
+
+.upNextBarTitle {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.lessonNavButtons {
+  min-width: 0;
+}
+
+/* "Next: {title}" — truncated so a long activity name never breaks the bar. */
+.nextLabel {
+  display: inline-block;
+  max-width: 260px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+@media (max-width: 575px) {
+  .nextLabel {
+    max-width: 150px;
+  }
+}
+
+.completedMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-success-text);
+}
+
+.mediaVideo {
+  width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  background: #000000; /* video viewport — section 4.7 */
+}
+
+/* ── Course page: student learning overview ──────────────────────────────────
+ * Layout only — reuses the existing panel, continueCard, lessonList and tree styles.
+ * Frame and column split match the course workspace so the Course Contents tree
+ * sits in the same place on both pages.
+ */
+
+.learnFrame {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 4px;
+}
+
+.learnFrame > .courseHero {
+  margin-bottom: 16px;
+}
+
+/* Header: smaller thumbnail so identity + progress read as one band. */
+.courseHeroCompact {
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  padding: 16px 20px;
+}
+
+.courseHeroCompact .courseHeroThumb {
+  width: 96px;
+  font-size: 26px;
+}
+
+.courseHeroCompact .pathHeroTitle {
+  font-size: 22px;
+}
+
+.heroProgress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  margin-top: 12px;
+}
+
+.heroProgress .progress {
+  flex: 1 1 320px;
+  max-width: 520px;
+}
+
+@media (max-width: 767px) {
+  .courseHeroCompact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .courseHeroCompact .courseHeroThumb {
+    display: none;
+  }
+}
+
+/* Next step when nothing is open: complete (green) or waiting (neutral). */
+.continueCardDone {
+  border-left-color: var(--sl-success);
+}
+
+.continueCardDone .continueIcon {
+  background: var(--sl-success-bg);
+  color: var(--sl-success);
+}
+
+.continueCardWaiting {
+  border-left-color: var(--sl-border-strong);
+}
+
+.continueCardWaiting .continueIcon {
+  background: var(--sl-divider);
+  color: var(--sl-text-muted);
+}
+
+/* Rail simulation: a thumbnail row, not a featured viewport. */
+.railSim {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.railSimThumb {
+  width: 56px;
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+  border: 1px solid var(--sl-border);
+  background: var(--sl-secondary-50) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-secondary);
+  font-size: 18px;
+}
+
+.railSimActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+/* Current module — header row (title + progress) above this module's activities. */
+.currentModule {
+  overflow: hidden;
+}
+
+.currentModuleHead {
+  padding: 14px 16px 14px;
+}
+
+.currentModuleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.currentModuleTitle {
+  margin: 2px 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--sl-text-primary);
+}
+
+.currentModuleCount {
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.currentModuleCount strong {
+  color: var(--sl-text-primary);
+  font-weight: 600;
+}
+
+/* Thin full-width bar under the title row — same fill as every progress bar. */
+.currentModuleBar {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: var(--sl-divider);
+  overflow: hidden;
+}
+
+.currentModule .lessonList {
+  border-top: 1px solid var(--sl-divider);
+}
+
+.currentModule .lessonRow:last-child {
+  border-bottom: none;
+}
+
+/* Supporting resources sit side by side, below the learning content. */
+.supportGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+/* ── Course Contents tree: modules as parents, activities as indented children ── */
+
+.treeModuleIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  font-size: 14px;
+}
+
+.treeModuleNote {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--sl-text-muted);
+}
+
+/* The module holding the highlighted activity reads as the active branch. */
+.treeModuleFocus > .treeModuleHead {
+  background: var(--sl-surface-muted);
+}
+
+.treeLessons {
+  margin: 2px 0 8px 14px;
+  padding-left: 4px;
+  border-left: 1px solid var(--sl-border);
+}
+
+/* ── Course catalog ───────────────────────────────────────────────────────────
+ * Layout only — panels, chips, buttons and the course card keep their styles.
+ * Order: heading → Continue Learning → one navigation panel (toolbar + tabs) → grid.
+ */
+
+.catalogFrame {
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+/* A page heading, not a card. */
+.catalogHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+}
+
+.catalogHead .sectionIntro {
+  margin-top: 2px;
+}
+
+/* Continue Learning — compact resume rows, not full cards. */
+.resumePanel {
+  padding: 14px 16px 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid var(--sl-primary);
+}
+
+.resumeList {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 10px 16px;
+}
+
+.resumeItem {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--sl-divider);
+  border-radius: 10px;
+  background: var(--sl-surface-muted);
+}
+
+.resumeThumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid var(--sl-border);
+  background: var(--sl-primary-100) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-primary-400);
+  font-size: 20px;
+}
+
+.resumeBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resumeBody .progress {
+  margin: 2px 0 0;
+}
+
+.resumeTitle {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--sl-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.resumeTitle:hover {
+  color: var(--sl-primary-hover);
+}
+
+/* "Next:" stays whole; only the activity name truncates (full text in the title tooltip). */
+.resumeNext {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  white-space: nowrap;
+}
+
+.resumeNext strong {
+  font-weight: 600;
+  color: var(--sl-text-body);
+}
+
+/* Catalog navigation — toolbar and status tabs in one panel. */
+.catalogNav {
+  padding: 12px 16px 0;
+  margin-bottom: 16px;
+}
+
+.catalogToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+}
+
+.catalogSearch {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+
+.catalogControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.catalogSort {
+  min-width: 170px;
+}
+
+.catalogTabs {
+  margin-top: 6px;
+}
+
+.catalogTabs :global(.ant-tabs-nav) {
+  margin-bottom: 0;
+}
+
+.catalogTabs :global(.ant-tabs-nav::before) {
+  border-bottom: none;
+}
+
+/* No-tabs variant (staff): keep the panel's bottom padding. */
+.catalogNav:not(:has(.catalogTabs)) {
+  padding-bottom: 12px;
+}
+
+.filterPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 260px;
+  max-width: calc(100vw - 48px);
+}
+
+.filterField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-text-secondary);
+}
+
+.catalogCount {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Course card — compact visual, fixed-height text blocks so CTAs align. */
+.courseThumbCompact {
+  aspect-ratio: auto;
+  height: 112px;
+  font-size: 28px;
+}
+
+.cardDesc {
+  height: calc(13px * 1.5 * 2);
+}
+
+.cardFacts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 44px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.cardFacts .progress {
+  margin: 0;
+}
+
+.cardFact {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sl-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardFact :global(.anticon) {
+  flex-shrink: 0;
+  color: var(--sl-text-muted);
+}
+
+.cardFact strong {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--sl-text-body);
+}
+
+.cardFactStrong {
+  color: var(--sl-text-body);
+  font-weight: 600;
+}
+
+@media (max-width: 767px) {
+  .catalogSearch {
+    flex-basis: 100%;
+    max-width: none;
+  }
+
+  .catalogControls {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .catalogControls > * {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .resumeList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resumeItem {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .resumeThumb {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Status tabs → wrapping status buttons when the catalog panel is narrow, so no
+   status hides behind the tabs' overflow menu. Measured on the panel itself, so
+   it also responds to the sidebar being open or collapsed. */
+.catalogNav {
+  container-type: inline-size;
+}
+
+.statusChips {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 0 12px;
+}
+
+/* Filter chip pattern (section 4.10): neutral at rest, orange tint when selected. */
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  border: 1px solid var(--sl-border);
+  border-radius: 999px;
+  background: var(--sl-surface);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-text-body);
+  cursor: pointer;
+}
+
+.statusChip:hover {
+  border-color: var(--sl-border-strong);
+}
+
+.statusChipActive,
+.statusChipActive:hover {
+  background: var(--sl-primary-100);
+  border-color: var(--sl-primary-300);
+  color: var(--sl-primary);
+  font-weight: 600;
+}
+
+.statusChipActive .tabCount {
+  background: var(--sl-surface);
+  color: var(--sl-primary-text);
+}
+
+@container (max-width: 760px) {
+  .catalogNav .catalogTabs {
+    display: none !important; /* antd sets display on .ant-tabs */
+  }
+
+  .statusChips {
+    display: flex;
+  }
+}
+
+.factLead {
+  flex-shrink: 0;
+}
+
+.resumeNext strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Student dashboard polish ─────────────────────────────────────────────────
+ * Layout only. Welcome is a heading, Continue is the strongest panel, stats are
+ * four quiet tiles, and the rail holds secondary information.
+ */
+
+.dashWelcome {
+  margin: 0 0 16px;
+}
+
+.dashWelcome .sectionIntro {
+  margin-top: 2px;
+}
+
+/* Four stats in one row on desktop, two-by-two below. */
+.statStripFour {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 767px) {
+  .statStripFour {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Course rows: the next due item sits under the title, one line. */
+.rowNext {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  white-space: nowrap;
+}
+
+.rowNext strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: var(--sl-text-body);
+}
+
+/* To-do rows: course name first, then type, due state and date. */
+.todoMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+}
+
+.todoCourse {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sl-text-body);
+}
+
+/* Rail: shortcuts and updates as simple link rows. */
+.shortcutList,
+.updateList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  margin: 0 -6px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--sl-text-body);
+}
+
+.shortcut:hover {
+  background: var(--sl-surface-muted);
+  color: var(--sl-text-primary);
+}
+
+.shortcut > :global(.anticon:first-child) {
+  color: var(--sl-secondary);
+}
+
+.shortcutLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.shortcutChevron {
+  font-size: 10px;
+  color: var(--sl-text-muted);
+}
+
+.updateRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.updateRow + .updateRow {
+  border-top: 1px solid var(--sl-divider);
+}
+
+.updateIcon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sl-secondary-50);
+  color: var(--sl-secondary);
+}
+
+.updateText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.updateText strong {
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.updateText span {
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+}
+
+.railLink {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sl-primary);
+}
+
+.railLink:hover {
+  color: var(--sl-primary-hover);
+}
+
+/* Dashboard Continue card — same card, tighter. */
+.continueCardCompact {
+  padding: 14px 20px;
+  gap: 12px 18px;
+}
+
+@media (min-width: 768px) {
+  .continueCardCompact {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+}
+
+.continueCardCompact .continueIcon {
+  width: 44px;
+  height: 44px;
+  font-size: 21px;
+}
+
+.continueCardCompact .continueTitle {
+  font-size: 17px;
+  margin: 1px 0 2px;
+}
+
+.continueCardCompact .continueProgress {
+  margin-top: 6px;
+}
+
+.continueCardCompact .continueNext {
+  margin-top: 6px;
+}
+
+/* Course row action: orange outline (secondary), full label width. */
+.rowAction {
+  font-weight: 600;
+}
+
+/* To-do rows: a due column between the details and the action. */
+.todoRow:has(.todoDue) {
+  grid-template-columns: 36px minmax(0, 1fr) auto auto;
+}
+
+.todoDue {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.todoDueLater {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sl-text-secondary);
+}
+
+.todoDueTime {
+  font-size: 11px;
+  color: var(--sl-text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 575px) {
+  .continueCardCompact {
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding: 14px 16px;
+  }
+
+  .todoRow:has(.todoDue) {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
+  /* Due column stays beside the title; the action drops to its own full-width row. */
+  .todoRow:has(.todoDue) > :last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ── Course shell: header + course navigation (course page views and workspace) ── */
+
+.courseShell {
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.courseShellTop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 32px;
+  padding: 16px 20px 14px;
+}
+
+.courseShellTitle {
+  margin: 0 0 2px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  color: var(--sl-text-primary);
+}
+
+.courseShellProgress {
+  flex: 0 1 380px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.courseShellProgress .progress {
+  margin: 0;
+}
+
+/* Course navigation — nav-item active state from section 4.10 (orange text + underline). */
+.courseNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.courseNavLinks {
+  display: flex;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.courseNavLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 10px 9px;
+  border-bottom: 2px solid transparent;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sl-text-body);
+  white-space: nowrap;
+}
+
+.courseNavLink :global(.anticon) {
+  font-size: 13px;
+  color: var(--sl-text-muted);
+}
+
+.courseNavLink:hover {
+  color: var(--sl-text-primary);
+}
+
+.courseNavActive,
+.courseNavActive:hover {
+  color: var(--sl-primary);
+  font-weight: 600;
+  border-bottom-color: var(--sl-primary);
+}
+
+.courseNavActive :global(.anticon) {
+  color: var(--sl-primary);
+}
+
+@media (max-width: 575px) {
+  .courseShellTop {
+    padding: 14px 16px 12px;
+  }
+
+  .courseShellProgress {
+    flex-basis: 100%;
+  }
+
+  .courseNav {
+    flex-wrap: wrap;
+    padding: 0 8px 8px;
+  }
+
+  .courseNavLink {
+    padding: 10px 8px 8px;
+    font-size: 13px;
+  }
+}
+
+/* Tree head: course progress lives in the header, so the tree just counts. */
+.treeHeadCount {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--sl-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.treeSimType {
+  color: var(--sl-secondary-text);
+  font-weight: 600;
+}
+
+/* Home: the main simulation sits below Up Next, a little smaller than before. */
+.simFeature {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+
+.inlineLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sl-primary);
+}
+
+.inlineLink:hover {
+  color: var(--sl-primary-hover);
+}
+
+.panelFooter {
+  padding: 10px 16px;
+  border-top: 1px solid var(--sl-divider);
+}
+
+/* Simulations / quizzes lists. */
+.simRow {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--sl-divider);
+}
+
+.simRow:last-child {
+  border-bottom: none;
+}
+
+.simRow > .todoIcon {
+  justify-self: center;
+}
+
+.gradebookNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--sl-text-body);
+  background: var(--sl-secondary-50);
+  border-color: var(--sl-secondary-100);
+}
+
+.gradebookNote > :global(.anticon) {
+  color: var(--sl-secondary);
+  font-size: 16px;
+}
+
+.gradebookNoteText {
+  flex: 1 1 220px;
+}
+
+/* Resources. */
+.resourceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.resourceCard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+}
+
+.resourceIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sl-secondary-50);
+  color: var(--sl-secondary);
+  font-size: 16px;
+}
+
+.resourceSteps {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sl-text-body);
+}
+
+.resourceText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--sl-text-body);
+}
+
+@media (max-width: 767px) {
+  .simFeature {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .simRow {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .simRow > :last-child {
+    grid-column: 2 / -1;
+  }
+}
+
+/* Phones: five course links on one line (scrolls if needed, never hidden),
+   Course Contents drawer button on its own row. */
+@media (max-width: 575px) {
+  .courseNav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0 4px 10px;
+  }
+
+  .courseNavLinks {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .courseNavLink {
+    padding: 10px 6px 8px;
+  }
+
+  .courseNavLink :global(.anticon) {
+    display: none;
+  }
+
+  .courseNav > :global(.ant-btn) {
+    margin: 6px 4px 0;
+  }
+}
+
+/* ── Instructor management (courses list, builder, lesson modal, pickers) ─── */
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+  color: var(--sl-text-primary);
+}
+
+.tableTitle {
+  font-weight: 600;
+  color: var(--sl-text-primary);
+}
+
+.tableTitle:hover {
+  color: var(--sl-primary-hover);
+}
+
+/* Secondary actions under a card's primary button: an even grid of labelled
+   buttons (no icon rails). Columns come from --cols on the element. */
+.managerCardActions {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+  gap: 6px;
+}
+
+.managerCardActions > a > :global(.ant-btn),
+.managerCardActions > :global(.ant-btn) {
+  width: 100%;
+  padding-inline: 4px;
+}
+
+/* Simulation card (Simulations page) — same shell as the course card. */
+.simCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+
+.simCard:hover {
+  transform: translateY(-3px);
+  border-color: var(--sl-primary-400);
+  box-shadow: 0 10px 32px rgba(245, 147, 36, 0.13);
+}
+
+.simCardThumb {
+  position: relative;
+  height: 140px;
+  background: var(--sl-secondary-50) center / cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sl-secondary);
+  font-size: 36px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--sl-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .simCard,
+  .simCard:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Builder */
+.panel.builderHead {
+  padding: 16px;
+}
+
+.builderModule {
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.builderModuleHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--sl-surface-muted);
+  border-bottom: 1px solid var(--sl-border);
+}
+
+.builderModuleTitle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.builderModuleActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.builderModuleBody {
+  padding: 6px 14px 14px;
+}
+
+.builderRowFocused {
+  border-color: var(--sl-primary-400);
+  background: var(--sl-primary-50);
+}
+
+.publishToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.autosaveNote {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+}
+
+.autosaveNote :global(.anticon) {
+  color: var(--sl-success);
+}
+
+@media (max-width: 767px) {
+  .builderModuleHead {
+    flex-wrap: wrap;
+  }
+
+  .builderModuleActions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Modals (lesson form, course picker). Modals render outside .page, so they get
+   rootClassName={s.page} for the tokens. */
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.lessonForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.modalSection {
+  padding: 16px 0;
+  border-top: 1px solid var(--sl-divider);
+}
+
+.modalSection:first-child {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.modalSectionTitle {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--sl-text-primary);
+}
+
+.modalHelp {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--sl-text-secondary);
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.modeOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sl-text-body);
+  background: var(--sl-surface);
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.modeOption:hover {
+  border-color: var(--sl-primary-400);
+}
+
+.modeOptionActive {
+  border-color: var(--sl-primary);
+  background: var(--sl-primary-100);
+  color: var(--sl-primary-text);
+  font-weight: 600;
+}
+
+.modeOptionIcon {
+  display: inline-flex;
+  color: var(--sl-text-secondary);
+}
+
+.modeOptionActive .modeOptionIcon {
+  color: var(--sl-primary);
+}
+
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.pickerItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  font: inherit;
+  background: var(--sl-surface);
+  border: 1px solid var(--sl-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.pickerItem:hover {
+  border-color: var(--sl-primary-400);
+}
+
+.pickerItemActive {
+  border-color: var(--sl-primary);
+  background: var(--sl-primary-50);
+}
+
+.pickerTitle {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sl-text-primary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pickerCheck {
+  color: var(--sl-primary);
+  font-size: 16px;
+}
+
+/* Workspace preview (instructor): a calm info strip, not a warning. */
+.previewNote {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--sl-secondary-text);
+  background: var(--sl-secondary-50);
+  border-color: var(--sl-secondary-100);
+}
+
+/* Courses toolbar: on phones the Cards / List toggle gets its own full row. */
+@media (max-width: 767px) {
+  .catalogControls > .catalogLayout {
+    flex-basis: 100%;
+  }
+
+  .catalogLayout :global(.ant-segmented-group) {
+    width: 100%;
+  }
+
+  .catalogLayout :global(.ant-segmented-item) {
+    flex: 1;
+  }
+}

@@ -1,6 +1,14 @@
 import type { NextConfig } from 'next';
 
+// Backend origin (no trailing slash), e.g. https://simlearn-backend.up.railway.app.
+// When set, /api/v1/* on this app is proxied to the backend so the HttpOnly
+// refresh cookie is first-party to the frontend domain — required because
+// *.vercel.app and *.up.railway.app are different sites (SameSite=Strict
+// cookies would never be sent, and proxy.ts could never see the session).
+const BACKEND_URL = process.env.BACKEND_URL?.replace(/\/+$/, '');
+
 const nextConfig: NextConfig = {
+  devIndicators: false,
   // Transpile Ant Design packages so Turbopack processes them through Next.js's
   // own bundler, preventing the "createContext is not a function" SSR error that
   // occurs when @ant-design/cssinjs runs in the server module graph.
@@ -8,19 +16,20 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: [
     '172.20.44.1',
     '172.20.44.1:3000',
+    // DEV ONLY — public preview through a Cloudflare quick tunnel (cloudflared).
+    '*.trycloudflare.com',
   ],
   images: {
     remotePatterns: [
-      // CloudFront CDN
+      // CloudFront CDN for S3-hosted images (SRS §8 AWS S3 + CloudFront)
       { protocol: 'https', hostname: '**.cloudfront.net' },
-      
-      // ADD YOUR RAILWAY BACKEND DOMAIN HERE
+      // Backend on Railway serves thumbnails / media from its own domain
       { protocol: 'https', hostname: '**.up.railway.app' },
-      
-      // ADD LOCALHOST FOR LOCAL DEVELOPMENT
-      { protocol: 'http', hostname: 'localhost' },
-      { protocol: 'http', hostname: '127.0.0.1' },
     ],
+  },
+  async rewrites() {
+    if (!BACKEND_URL) return [];
+    return [{ source: '/api/v1/:path*', destination: `${BACKEND_URL}/api/v1/:path*` }];
   },
   async headers() {
     return [

@@ -1,23 +1,29 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useSyncExternalStore } from 'react';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Layout, Menu, Spin, Breadcrumb, type MenuProps,
+  Layout, Menu, Spin, Breadcrumb, ConfigProvider, type MenuProps,
 } from 'antd';
 import {
   AppstoreOutlined, BookOutlined, ExperimentOutlined,
-  BarChartOutlined, MessageOutlined, LineChartOutlined,
+  BarChartOutlined, MailOutlined, LineChartOutlined,
   TeamOutlined, SafetyCertificateOutlined, BankOutlined,
   SettingOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   BellOutlined, AppstoreAddOutlined,
-  AuditOutlined, EditOutlined,
+  AuditOutlined, EditOutlined, ApiOutlined,
 } from '@ant-design/icons';
 import { useEffect } from 'react';
 import UserMenu from '@/components/auth/UserMenu';
+import NotificationBell from '@/components/layout/NotificationBell';
+import { BEDO_APP_THEME, BEDO_SKIN_ROLES } from '@/components/layout/bedoAppTheme';
+import skin from '@/components/layout/BedoAppSkin.module.css';
 
 const { Sider, Header, Content } = Layout;
+
+const HEADER_HEIGHT = 60;
 
 interface NavItem {
   key: string;
@@ -46,13 +52,17 @@ const LEARNING_NAV: NavItem[] = [
     excludeRoles: ['super_admin'],
   },
   {
-    key: '/messages', label: 'Messages', icon: <MessageOutlined />,
+    key: '/mail', label: 'Messages', icon: <MailOutlined />,
     anyPermission: ['messages.send', 'messages.view'],
   },
   {
-    key: '/analytics', label: 'Analytics', icon: <LineChartOutlined />,
-    anyPermission: ['platform.reports.view'],
+    key: '/notifications', label: 'Notifications', icon: <BellOutlined />,
+    anyPermission: ['notifications.view'],
   },
+  // {
+  //   key: '/analytics', label: 'Analytics', icon: <LineChartOutlined />,
+  //   anyPermission: ['platform.reports.view'],
+  // },
 ];
 
 const MANAGEMENT_NAV: NavItem[] = [
@@ -85,14 +95,18 @@ const PLATFORM_NAV: NavItem[] = [
     key: '/settings', label: 'Settings', icon: <SettingOutlined />,
     anyPermission: ['platform.settings.manage', 'institutions.manage_own'],
   },
-  {
-    key: '/audit-logs', label: 'Audit Logs', icon: <AuditOutlined />,
-    anyPermission: ['platform.audit.view', 'audit.view_institution'],
-  },
-  {
-    key: '/page-content', label: 'Page Content', icon: <EditOutlined />,
-    anyPermission: ['platform.settings.manage'],
-  },
+  // {
+  //   key: '/audit-logs', label: 'Audit Logs', icon: <AuditOutlined />,
+  //   anyPermission: ['platform.audit.view', 'audit.view_institution'],
+  // },
+  // {
+  //   key: '/page-content', label: 'Page Content', icon: <EditOutlined />,
+  //   anyPermission: ['platform.settings.manage'],
+  // },
+  // {
+  //   key: '/lti-settings', label: 'LTI Integration', icon: <ApiOutlined />,
+  //   anyPermission: ['lti_platforms.view_own', 'lti_platforms.view_all'],
+  // },
 ];
 
 const ALL_NAV_ITEMS: NavItem[] = [
@@ -108,12 +122,50 @@ function getSelectedKey(pathname: string): string {
   return match?.key ?? '/dashboard';
 }
 
+// Below 768px the sidebar leaves the layout and opens as an overlay from the
+// header menu button, so page content gets the full viewport width.
+const MOBILE_QUERY = '(max-width: 767px)';
+function subscribeMobile(onChange: () => void) {
+  const mq = window.matchMedia(MOBILE_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, hasAnyPermission, hasRole } = useAuth();
   const router   = useRouter();
   const pathname = usePathname();
 
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobile = useSyncExternalStore(
+    subscribeMobile,
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false,
+  );
+  // On mobile the sidebar is either fully open (overlay) or fully hidden.
+  const siderCollapsed = isMobile ? !mobileNavOpen : collapsed;
+  const mobileOverlay = isMobile && mobileNavOpen;
+
+  // Escape closes the mobile overlay.
+  useEffect(() => {
+    if (!mobileOverlay) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOverlay]);
+
+  // Instructor / TA / student interface gets the BEDO design-system skin;
+  // admin-facing roles keep the current shell look.
+  const bedoSkin = !!user && BEDO_SKIN_ROLES.some((r) => hasRole(r));
+
+  // Modals, drawers and dropdowns render into <body>, outside <Content>, so the
+  // skin class also goes on <body> while this shell is mounted.
+  useEffect(() => {
+    if (!bedoSkin) return;
+    document.body.classList.add(skin.root);
+    return () => document.body.classList.remove(skin.root);
+  }, [bedoSkin]);
 
   useEffect(() => {
     if (loading || user) return;
@@ -166,6 +218,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const selectedKey = getSelectedKey(pathname);
+  // Width of the sidebar beside the content; the fixed header starts at the same edge.
+  const contentOffset = isMobile ? 0 : collapsed ? 64 : 220;
 
   function buildBreadcrumbs() {
     const segments = pathname.split('/').filter(Boolean);
@@ -191,15 +245,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
+    <ConfigProvider theme={bedoSkin ? BEDO_APP_THEME : undefined}>
     <Layout style={{ minHeight: '100vh' }}>
       {/* -- Sidebar ------------------------------------------------------─ */}
       <Sider
+        id="app-sidebar"
         collapsible
-        collapsed={collapsed}
+        collapsed={siderCollapsed}
         onCollapse={setCollapsed}
 
         width={220}
-        collapsedWidth={64}
+        collapsedWidth={isMobile ? 0 : 64}
         trigger={null}
         style={{
           position: 'fixed',
@@ -208,9 +264,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           zIndex: 100,
           overflow: 'auto',
           background: '#EEF0F2',
-          borderRight: '1px solid #d5d6d8',
+          // Hidden mobile sidebar has zero width — drop its edge so nothing shows.
+          borderRight: isMobile && !mobileNavOpen ? 'none' : bedoSkin ? '1px solid #DDDEDF' : '1px solid #d5d6d8',
           //add shadow to the right of the sidebar
-          boxShadow: '2px 0 6px rgba(0, 0, 0, 0.16)',
+          boxShadow: isMobile && !mobileNavOpen ? 'none' : '2px 0 6px rgba(0, 0, 0, 0.16)',
         }}
       >
         {/* Logo */}
@@ -219,11 +276,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M8 12L11 15L16 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg> */}
-            <img src="/Virtual-logo.png" alt="SimuLearn Logo" style={{ width: 50, height: 40 }} />
+            <Image src="/Virtual-logo.png" alt="SimuLearn Logo" width={50} height={40} />
           </div>
-          {!collapsed && (
+          {!siderCollapsed && (
             <span style={{  fontWeight: 800, fontSize: 15, marginLeft: 10, whiteSpace: 'nowrap' }}>
-              Bedo SimuLearn
+              BEDO SimuLearn
             </span>
           )}
         </div>
@@ -233,50 +290,90 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           mode="inline"
           selectedKeys={[selectedKey]}
           items={buildMenuItems()}
-          onClick={({ key }: { key: string }) => router.push(key)}
+          onClick={({ key }: { key: string }) => { setMobileNavOpen(false); router.push(key); }}
           style={{ borderRight: 0, marginTop: 4  ,backgroundColor: '#EEF0F2', color: 'white', fontSize: 13, fontWeight: 500 }}
         />
       </Sider>
-      
+
+      {/* Mobile: the open sidebar overlays the page; tapping outside closes it. */}
+      {mobileOverlay && (
+        <div
+          aria-hidden
+          onClick={() => setMobileNavOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 99, background: 'rgba(0, 0, 0, 0.45)' }}
+        />
+      )}
 
       {/* -- Main area ----------------------------------------------------─ */}
       <Layout
         style={{
-          marginLeft: collapsed ? 64 : 220,
+          marginLeft: contentOffset,
           transition: 'margin-left 0.2s',
+          minWidth: 0,
+          // Reserves the fixed header's height so page content never starts underneath it.
+          paddingTop: HEADER_HEIGHT,
         }}
       >
-        {/* Top header */}
-        <Header className="dashboard-header" style={{ height: 60, lineHeight: '60px' ,backgroundColor: '#a8d2e7', padding: '0 1rem', display: 'flex', alignItems: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
+        {/* Top header — fixed rather than sticky: antd's modal scroll-lock puts
+            overflow on <body>, which would detach a sticky header while a modal is open.
+            Below the sidebar (z 100) and its mobile overlay (z 99); above page content. */}
+        <Header
+          className="dashboard-header"
+          style={{
+            height: HEADER_HEIGHT, lineHeight: `${HEADER_HEIGHT}px`, padding: isMobile ? '0 0.5rem' : '0 1rem', display: 'flex', alignItems: 'center',
+            position: 'fixed', top: 0, left: contentOffset, right: 0, zIndex: 10, transition: 'left 0.2s',
+            ...(bedoSkin
+              ? { backgroundColor: '#FFFFFF', borderBottom: '1px solid #DDDEDF', boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }
+              : { backgroundColor: '#a8d2e7', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }),
+          }}
+        >
           <span
-            onClick={() => setCollapsed(!collapsed)}
+            role="button"
+            tabIndex={0}
+            aria-label={siderCollapsed ? 'Open navigation' : 'Close navigation'}
+            aria-controls="app-sidebar"
+            aria-expanded={!siderCollapsed}
+            onClick={() => (isMobile ? setMobileNavOpen((o) => !o) : setCollapsed(!collapsed))}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
+              if (isMobile) setMobileNavOpen((o) => !o); else setCollapsed(!collapsed);
+            }}
             style={{ fontSize: 18, cursor: 'pointer', color: '#374151', padding: '0 8px' }}
           >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            {siderCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
           </span>
 
-          <Breadcrumb
-            items={buildBreadcrumbs()}
-            style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#6B7280', flex: 1, marginLeft: 16 }}
-          />
+          {/* The breadcrumb wraps into several lines on phones; there the page title carries context. */}
+          {isMobile ? (
+            <span style={{ flex: 1 }} />
+          ) : (
+            <Breadcrumb
+              items={buildBreadcrumbs()}
+              style={{ display: 'flex', alignItems: 'center', fontSize: 13, color: '#6B7280', flex: 1, marginLeft: 16 }}
+            />
+          )}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <BellOutlined style={{ fontSize: 18, color: '#6B7280', cursor: 'pointer' }} />
+            <NotificationBell />
             <UserMenu />
           </div>
         </Header>
 
         {/* Page content */}
         <Content
+          className={['app-content', bedoSkin ? skin.root : ''].filter(Boolean).join(' ')}
           style={{
-            padding: '1.5rem',
+            padding: isMobile ? '1rem 0.75rem' : '1.5rem',
             minHeight: 'calc(100vh - 60px)',
             background: '#EEF0F2',
           }}
         >
-          {children}
+          {/* Background stays full width; page content is centred and capped on large screens. */}
+          <div className="app-page-container">{children}</div>
         </Content>
       </Layout>
     </Layout>
+    </ConfigProvider>
   );
 }

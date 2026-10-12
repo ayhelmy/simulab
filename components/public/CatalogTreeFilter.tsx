@@ -5,6 +5,7 @@ import { Tree, Spin, Typography, Empty } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import type { SimulationCatalog } from '@/types';
 import { CaretDownOutlined, CaretLeftOutlined, CaretRightOutlined, CaretUpOutlined, DownOutlined } from '@ant-design/icons/es/icons/index';
+import { colors } from '../home/homeTheme';
 
 const { Text } = Typography;
 
@@ -72,12 +73,12 @@ export default function CatalogTreeFilter({
       defaultExpandAll={false}
       blockNode
       showLine={false}
-      style={{ background: 'transparent' }}
+      style={{ background: colors.bgAlt, padding: '8px 0', borderRadius: 8  }}
       aria-label="Simulation catalog tree"
 
   switcherIcon={({ expanded }) => (
         <CaretLeftOutlined
-          style={{ transform: `rotate(${expanded ? 0 : -90}deg)`, transition: 'transform 0.3s' , color: '#F59324'}}
+          style={{ transform: `rotate(${expanded ? 0 : -90}deg)`, transition: 'transform 0.3s' , color: 'black'}}
         />
       )}
 

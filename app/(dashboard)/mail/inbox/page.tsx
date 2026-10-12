@@ -1,0 +1,7 @@
+'use client';
+
+import MailList from '@/components/mail/MailList';
+
+export default function InboxPage() {
+  return <MailList folder="inbox" />;
+}

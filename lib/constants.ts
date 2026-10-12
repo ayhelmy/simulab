@@ -1,9 +1,11 @@
 // SRS §4.1: token TTLs, pagination defaults, role lists.
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL ??
-  process.env.REACT_APP_API_BASE_URL ??
-  'https://backend-production-a76c.up.railway.app/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://172.20.44.1:5000/api/v1';
+
+// Large multipart uploads (WebGL builds, lesson files) go straight to the
+// backend instead of through the /api/v1 rewrite proxy, which caps request
+// body size. They authenticate with the Bearer token, so no cookie is needed.
+export const UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL || API_BASE_URL;
 
 export const ACCESS_TOKEN_KEY = 'sl_access_token';  // in-memory only (never localStorage)
 

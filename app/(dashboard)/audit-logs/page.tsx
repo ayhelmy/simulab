@@ -5,15 +5,14 @@ import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/lib/api';
 import type { PaginationMeta } from '@/types/api';
-import PageHeader from '@/components/common/PageHeader';
+import { Table, Input, Pagination, Button, Tooltip, type TableColumnsType } from 'antd';
+import { AuditOutlined, ReloadOutlined } from '@ant-design/icons';
 import {
-  Table, Tag, Input, Pagination, Spin, Alert, Typography, Row, Col,
-  type TableColumnsType,
-} from 'antd';
-import { AuditOutlined } from '@ant-design/icons';
+  ADMIN_PAGE_CLASS, adminStyles as a, AdminHeader, AdminCard, Toolbar, ResultCount,
+  StateBlock, LoadErrorState, formatWhen, statusLabel,
+} from '@/components/admin/adminUi';
 
 const { Search } = Input;
-const { Text }   = Typography;
 
 interface AuditEntry {
   id: string;
@@ -64,90 +63,112 @@ export default function AuditLogsPage() {
 
   const columns: TableColumnsType<AuditEntry> = [
     {
-      title: 'Timestamp',
+      title: 'Time',
       dataIndex: 'createdAt',
-      width: 180,
+      width: 160,
       render: (ts: string) => (
-        <Text style={{ fontSize: 12 }}>{new Date(ts).toLocaleString()}</Text>
+        <span style={{ whiteSpace: 'nowrap' }} title={new Date(ts).toLocaleString()}>{formatWhen(ts)}</span>
       ),
     },
     {
       title: 'Actor',
       dataIndex: 'actorEmail',
-      render: (email: string) => <Text>{email ?? '—'}</Text>,
+      render: (email: string | undefined) => email ?? <span className={a.muted}>System</span>,
     },
     {
       title: 'Action',
       dataIndex: 'action',
-      render: (action: string) => (
-        <Tag color="blue" style={{ fontFamily: 'monospace', fontSize: 11 }}>{action}</Tag>
-      ),
+      render: (action: string) => <span className={a.mono}>{action}</span>,
     },
     {
-      title: 'Entity',
+      title: 'Affected item',
       key: 'entity',
       render: (_: unknown, row: AuditEntry) => row.entityType ? (
-        <Text type="secondary" style={{ fontSize: 12 }}>
-          {row.entityType} · {row.entityId?.slice(0, 8)}…
-        </Text>
-      ) : '—',
+        <Tooltip title={row.entityId}>
+          <span className={a.cellSub} style={{ fontSize: 13 }}>{statusLabel(row.entityType)}</span>
+        </Tooltip>
+      ) : <span className={a.muted}>—</span>,
     },
   ];
 
   return (
-    <div>
-      <PageHeader
+    <div className={ADMIN_PAGE_CLASS}>
+      <AdminHeader
         title="Audit Logs"
-        subtitle={total ? `${total.toLocaleString()} entries` : undefined}
+        subtitle={canViewAll
+          ? 'Review changes made across the platform: who did what, and when.'
+          : 'Review changes made in your institution: who did what, and when.'}
       />
 
-      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        <Col flex="1 1 300px">
-          <Search
-            placeholder="Search by action or actor…"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            allowClear
-          />
-        </Col>
-      </Row>
-
-      {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
-
-      {loading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
-          <Spin size="large" />
-        </div>
-      ) : logs.length === 0 ? (
-        <Alert
-          type="info"
-          showIcon
-          icon={<AuditOutlined />}
-          title="No audit log entries found."
-        />
-      ) : (
-        <>
-          <Table
-            dataSource={logs}
-            columns={columns}
-            rowKey="id"
-            size="small"
-           
-          />
-          {total > 25 && (
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-              <Pagination
-                current={page}
-                total={total}
-                pageSize={25}
-                onChange={setPage}
-                showSizeChanger={false}
-                size="small"
+      <AdminCard
+        flush
+        toolbar={
+          <Toolbar
+            search={
+              <Search
+                placeholder="Search by action or actor"
+                aria-label="Search audit logs by action or actor"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                allowClear
               />
-            </div>
-          )}
-        </>
-      )}
+            }
+            end={
+              <>
+                {!error && !loading && <ResultCount total={total} noun="entry" plural="entries" />}
+                <Tooltip title="Refresh">
+                  <Button icon={<ReloadOutlined />} aria-label="Refresh audit logs" onClick={load} />
+                </Tooltip>
+              </>
+            }
+          />
+        }
+      >
+        {error ? (
+          <LoadErrorState
+            title="Could not load audit logs"
+            text="Audit log entries could not be loaded. Check the connection or try again."
+            detail={error}
+            onRetry={load}
+          />
+        ) : (
+          <>
+            <Table
+              dataSource={logs}
+              columns={columns}
+              rowKey="id"
+              size="middle"
+              loading={loading}
+              scroll={{ x: 720 }}
+              // The page pages through the API (25 per page) below.
+              pagination={false}
+              locale={{
+                emptyText: loading ? ' ' : search ? (
+                  <StateBlock kind="no-match" title="No entries match your search" text="Try a different action name or actor email."
+                    actions={<Button onClick={() => { setSearch(''); setPage(1); }}>Clear search</Button>} />
+                ) : (
+                  <StateBlock icon={<AuditOutlined />} title="No records found" text="Records will appear here once they are created or synced." />
+                ),
+              }}
+            />
+            {total > 25 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #F3F4F6' }}>
+                <span style={{ fontSize: 13, color: '#6B7280' }}>
+                  Showing {(page - 1) * 25 + 1}–{Math.min(page * 25, total)} of {total.toLocaleString()}
+                </span>
+                <Pagination
+                  current={page}
+                  total={total}
+                  pageSize={25}
+                  onChange={setPage}
+                  showSizeChanger={false}
+                  size="small"
+                />
+              </div>
+            )}
+          </>
+        )}
+      </AdminCard>
     </div>
   );
 }

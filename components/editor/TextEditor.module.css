@@ -124,3 +124,26 @@
   box-shadow: none !important;
   background: transparent;
 }
+
+/* 
+.editorWrapper {
+  width: 100%;
+}
+
+.editorWrapper :global(.ck-editor__editable) {
+  min-height: 250px;
+}
+
+.readOnly :global(.ck-editor__editable) {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.readOnly :global(.ck-toolbar) {
+  display: none;
+}
+
+.editMode :global(.ck-toolbar) {
+  display: flex;
+} */

@@ -3,7 +3,8 @@
 import { use, useState, useEffect, useCallback } from 'react';
 import { uploadLessonFile } from '@/lib/files';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
   getCourse, updateCourse, publishCourse, archiveCourse, deleteCourse,
@@ -13,29 +14,41 @@ import {
   getCourseTree, createModule, updateModule, deleteModule,
   createLesson, updateLesson, deleteLesson,
 } from '@/lib/modules';
+import { listQuizzes, createQuiz } from '@/lib/quizzes';
 import { listDepartments } from '@/lib/departments';
 import { listAcademicYears } from '@/lib/academic-years';
 import { listSemesterTerms } from '@/lib/semester-terms';
 import type {
-  Course, Simulation, CourseModule, Lesson,
+  Course, Simulation, CourseModule, Lesson, Quiz,
   AcademicYear, SemesterTerm, LessonMode, ContentType,
 } from '@/types';
 import type { Department } from '@/lib/departments';
 import {
-  Form, Input, Select, InputNumber, Button, Card, Alert, Breadcrumb,
-  Row, Col, Typography, Tag, Descriptions, Spin, Popconfirm, Space,
-  Divider, App, Tabs, Modal, Radio, Empty, Switch, DatePicker, Tooltip,
-  Upload,
+  Form, Input, Select, InputNumber, Button, Card, Alert,
+  Row, Col, Typography, Tag, Spin, Popconfirm, Space,
+  Divider, App, Tabs, Modal, Empty, Switch, DatePicker, Tooltip,
+  Upload, Segmented,
 } from 'antd';
 import {
   RocketOutlined, InboxOutlined, DeleteOutlined, SaveOutlined,
   PlusOutlined, AppstoreOutlined, FileTextOutlined,
   VideoCameraOutlined, LinkOutlined, DownOutlined, RightOutlined,
-  EditOutlined, LockOutlined, UnorderedListOutlined, ExperimentOutlined,
-  MergeCellsOutlined, UploadOutlined, CheckCircleFilled,
+  EditOutlined, LockOutlined, ExperimentOutlined,
+  MergeCellsOutlined, UploadOutlined, CheckCircleFilled, FormOutlined,
+  CheckSquareOutlined, EyeOutlined, SettingOutlined, PictureOutlined,
 } from '@ant-design/icons';
 import StatusTag from '@/components/common/StatusTag';
+import {
+  Chip, LessonTypeChip, formatDate, formatMinutes, learningStyles as s,
+} from '@/components/student/studentUi';
 import dayjs from 'dayjs';
+
+// CKEditor is one of the heaviest deps in this app — load it only when a
+// rich-text content editor is actually rendered.
+const TextEditor = dynamic(() => import('@/components/editor/TextEditor'), {
+  ssr: false,
+  loading: () => <Spin size="small" />,
+});
 
 const { TextArea } = Input;
 const { Title, Text } = Typography;
@@ -63,6 +76,30 @@ const LESSON_MODE_OPTIONS: { value: LessonMode; label: string; icon: React.React
     icon:        <MergeCellsOutlined />,
     description: 'Reading/media material followed by an interactive simulation.',
   },
+  {
+    value:       'quiz',
+    label:       'Quiz only',
+    icon:        <FormOutlined />,
+    description: 'A graded quiz with auto-scored questions.',
+  },
+  {
+    value:       'content_and_quiz',
+    label:       'Content + Quiz',
+    icon:        <MergeCellsOutlined />,
+    description: 'Reading/media material followed by a quiz.',
+  },
+  {
+    value:       'simulation_and_quiz',
+    label:       'Simulation + Quiz',
+    icon:        <MergeCellsOutlined />,
+    description: 'An interactive simulation followed by a quiz.',
+  },
+  {
+    value:       'content_simulation_and_quiz',
+    label:       'Content + Sim + Quiz',
+    icon:        <MergeCellsOutlined />,
+    description: 'Reading/media material, a simulation, and a quiz.',
+  },
 ];
 
 const CONTENT_TYPE_OPTIONS: { value: ContentType; label: string; icon: React.ReactNode }[] = [
@@ -72,22 +109,15 @@ const CONTENT_TYPE_OPTIONS: { value: ContentType; label: string; icon: React.Rea
   { value: 'url',       label: 'External URL',  icon: <LinkOutlined /> },
 ];
 
+// BEDO palette — same mapping as the student course view (courses/[id]/home).
 const MODE_COLOR: Record<LessonMode, string> = {
-  content:                '#1677FF',
-  simulation:             '#52C41A',
-  content_and_simulation: '#722ED1',
-};
-
-const MODE_TAG_COLOR: Record<LessonMode, string> = {
-  content:                'blue',
-  simulation:             'green',
-  content_and_simulation: 'purple',
-};
-
-const MODE_LABEL: Record<LessonMode, string> = {
-  content:                'Content',
-  simulation:             'Simulation',
-  content_and_simulation: 'Content+Sim',
+  content:                      '#6B7280',
+  simulation:                   '#5C98B7',
+  content_and_simulation:       '#2F5A70',
+  quiz:                         '#F59324',
+  content_and_quiz:             '#E07B15',
+  simulation_and_quiz:          '#E07B15',
+  content_simulation_and_quiz:  '#E07B15',
 };
 
 // -- SimulationPicker ----------------------------------------------------------
@@ -113,6 +143,9 @@ function SimulationPicker({
 
   if (loading) return <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>;
 
+  // A simulation pre-selected elsewhere (Add to Course) that this course can't use.
+  const unavailable = !!value && sims.length > 0 && !sims.some(x => x.id === value);
+
   if (!sims.length) return (
     <Alert
       type="warning"
@@ -124,6 +157,15 @@ function SimulationPicker({
 
   return (
     <div>
+      {unavailable && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          message="The simulation you chose isn't in this course's department catalog."
+          description="Pick one of the available simulations below, or ask your administrator to assign its catalog to the department."
+        />
+      )}
       <Input.Search
         placeholder="Filter simulations…"
         value={search}
@@ -138,7 +180,7 @@ function SimulationPicker({
             size="small"
             style={{
               cursor: 'pointer',
-              borderColor: value === s.id ? '#1677FF' : undefined,
+              borderColor: value === s.id ? '#F59324' : undefined,
               background:  value === s.id ? '#FEF3E2' : undefined,
             }}
             onClick={() => onChange(s.id)}
@@ -149,7 +191,7 @@ function SimulationPicker({
                 <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
                   <Tag style={{ fontSize: 11 }}>{s.type}</Tag>
                   <Tag
-                    color={s.difficulty === 'beginner' ? 'green' : s.difficulty === 'advanced' ? 'red' : 'orange'}
+                    color={s.difficulty === 'beginner' ? 'green' : s.difficulty === 'advanced' ? 'red' : 'blue'}
                     style={{ fontSize: 11 }}
                   >
                     {s.difficulty}
@@ -157,12 +199,134 @@ function SimulationPicker({
                   {s.estimatedMinutes && <Tag style={{ fontSize: 11 }}>{s.estimatedMinutes} min</Tag>}
                 </div>
               </div>
-              {value === s.id && <Tag color="blue">Selected</Tag>}
+              {value === s.id && <Tag color="orange">Selected</Tag>}
             </div>
           </Card>
         ))}
         {!filtered.length && <Text type="secondary">No simulations match your search.</Text>}
       </div>
+    </div>
+  );
+}
+
+// -- QuizPicker -----------------------------------------------------------------
+
+function QuizPicker({
+  courseId, value, onChange,
+}: { courseId: string; value?: string | null; onChange: (id: string) => void }) {
+  const router = useRouter();
+  const { message } = App.useApp();
+  const { user, hasRole } = useAuth();
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch]   = useState('');
+  const [creating, setCreating] = useState(false);
+
+  // Only the quiz's own creator can attach it to a lesson (enforced server-side too, in
+  // assertQuizAccess) — admins retain the ability to see and attach any quiz in the course.
+  const canSeeAnyQuiz = hasRole('super_admin') || hasRole('institution_admin') || hasRole('dept_manager');
+
+  const load = useCallback(() => {
+    setLoading(true);
+    listQuizzes(courseId)
+      .then(list => setQuizzes(canSeeAnyQuiz ? list : list.filter(q => q.createdBy === user?.id)))
+      .catch(() => setQuizzes([]))
+      .finally(() => setLoading(false));
+  }, [courseId, canSeeAnyQuiz, user?.id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleCreateNew = async () => {
+    setCreating(true);
+    try {
+      const quiz = await createQuiz(courseId, { title: 'Untitled Quiz' });
+      router.push(`/courses/${courseId}/quizzes/${quiz.id}/edit`);
+    } catch (err: unknown) {
+      const e = err as { detail?: string; title?: string };
+      message.error(e.detail ?? e.title ?? 'Failed to create quiz.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const filtered = quizzes.filter(q =>
+    !search || q.title.toLowerCase().includes(search.toLowerCase()),
+  );
+
+  return (
+    <div>
+      <Button
+        type="dashed"
+        icon={<PlusOutlined />}
+        loading={creating}
+        onClick={handleCreateNew}
+        block
+        style={{ marginBottom: 10 }}
+      >
+        Create New Quiz
+      </Button>
+      <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 8 }}>
+        Creating a new quiz opens its editor in this tab. Come back here afterwards and pick it from the list below.
+      </Text>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 20 }}><Spin /></div>
+      ) : !quizzes.length ? (
+        <Alert
+          type="info"
+          showIcon
+          message="No quizzes yet"
+          description="Use the button above to create the first quiz for this course."
+        />
+      ) : (
+        <>
+          <Input.Search
+            placeholder="Filter quizzes…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ marginBottom: 12 }}
+            allowClear
+          />
+          <div style={{ maxHeight: 280, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {filtered.map(q => (
+              <Card
+                key={q.id}
+                size="small"
+                style={{
+                  cursor: 'pointer',
+                  borderColor: value === q.id ? '#F59324' : undefined,
+                  background:  value === q.id ? '#FEF3E2' : undefined,
+                }}
+                onClick={() => onChange(q.id)}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <Text strong style={{ fontSize: 13 }}>{q.title}</Text>
+                    <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+                      <Tag color={q.status === 'published' ? 'green' : 'default'} style={{ fontSize: 11 }}>
+                        {q.status}
+                      </Tag>
+                      <Tag style={{ fontSize: 11 }}>{q.pointsPossible} pts</Tag>
+                    </div>
+                  </div>
+                  <Space size={4}>
+                    {value === q.id && <Tag color="orange">Selected</Tag>}
+                    <Tooltip title="Edit this quiz">
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={(e) => { e.stopPropagation(); router.push(`/courses/${courseId}/quizzes/${q.id}/edit`); }}
+                      />
+                    </Tooltip>
+                  </Space>
+                </div>
+              </Card>
+            ))}
+            {!filtered.length && <Text type="secondary">No quizzes match your search.</Text>}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -194,12 +358,10 @@ function ContentEditor({
 
   if (contentType === 'rich_text') {
     return (
-      <Form.Item label="Content">
-        <TextArea
-          rows={6}
-          value={(content.body as string) ?? ''}
-          onChange={e => onChange({ ...content, body: e.target.value })}
-          placeholder="Write lesson content here…"
+      <Form.Item label="Text">
+        <TextEditor
+          body={(content.body as string) ?? ''}
+          onChange={body => onChange({ ...content, body })}
         />
       </Form.Item>
     );
@@ -213,7 +375,7 @@ function ContentEditor({
         <Form.Item label="Video File" required>
           {url && (
             <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CheckCircleFilled style={{ color: '#52C41A' }} />
+              <CheckCircleFilled style={{ color: '#059669' }} />
               <Text style={{ fontSize: 12 }}>{fileName || url}</Text>
             </div>
           )}
@@ -251,7 +413,7 @@ function ContentEditor({
       <Form.Item label="File" required>
         {url && (
           <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CheckCircleFilled style={{ color: '#52C41A' }} />
+            <CheckCircleFilled style={{ color: '#059669' }} />
             <Text style={{ fontSize: 12 }}>{fileName || url}</Text>
           </div>
         )}
@@ -287,295 +449,191 @@ function ContentEditor({
   return null;
 }
 
-// -- AddLessonModal ------------------------------------------------------------
+// -- LessonFormModal ------------------------------------------------------------
+// One modal for adding and editing a lesson, with a single structure top to bottom:
+// Lesson Title · Lesson Mode · Content (type + editor) · Simulation · Quiz ·
+// Completion. Only the sections the selected mode uses are shown. The body scrolls;
+// the footer (Cancel · Save Lesson) stays visible.
 
-function AddLessonModal({
-  open, courseId, moduleId, onClose, onAdded,
+const CONTENT_MODES: LessonMode[] = ['content', 'content_and_simulation', 'content_and_quiz', 'content_simulation_and_quiz'];
+const SIM_MODES: LessonMode[]     = ['simulation', 'content_and_simulation', 'simulation_and_quiz', 'content_simulation_and_quiz'];
+const QUIZ_MODES: LessonMode[]    = ['quiz', 'content_and_quiz', 'simulation_and_quiz', 'content_simulation_and_quiz'];
+
+function LessonFormModal({
+  open, courseId, moduleId, lesson, initialSimulationId, onClose, onSaved,
 }: {
   open: boolean; courseId: string; moduleId: string;
-  onClose: () => void; onAdded: () => void;
+  /** Present when editing; absent when adding a new lesson. */
+  lesson?: Lesson;
+  /** Pre-selects a simulation (Add to Course from the Simulations page). */
+  initialSimulationId?: string | null;
+  onClose: () => void; onSaved: () => void;
 }) {
   const { message } = App.useApp();
-  const [lessonMode,  setLessonMode]  = useState<LessonMode>('content');
-  const [contentType, setContentType] = useState<ContentType>('rich_text');
-  const [content,     setContent]     = useState<Record<string, unknown>>({});
-  const [title,       setTitle]       = useState('');
-  const [selectedSim, setSelectedSim] = useState<string | null>(null);
-  const [saving,      setSaving]      = useState(false);
-  const [estMins,     setEstMins]     = useState<number | null>(null);
-  const [isRequired,  setIsRequired]  = useState(true);
+  const isEdit = !!lesson;
+  const [title,        setTitle]        = useState(lesson?.title ?? '');
+  const [lessonMode,   setLessonMode]   = useState<LessonMode>(lesson?.lessonMode ?? (initialSimulationId ? 'simulation' : 'content'));
+  const [contentType,  setContentType]  = useState<ContentType>((lesson?.contentType as ContentType) ?? 'rich_text');
+  const [content,      setContent]      = useState<Record<string, unknown>>(lesson?.content ?? {});
+  const [selectedSim,  setSelectedSim]  = useState<string | null>(lesson?.simulationId ?? initialSimulationId ?? null);
+  const [selectedQuiz, setSelectedQuiz] = useState<string | null>(lesson?.quizId ?? null);
+  const [estMins,      setEstMins]      = useState<number | null>(lesson?.estimatedMinutes ?? null);
+  const [isRequired,   setIsRequired]   = useState(lesson?.isRequired ?? true);
+  const [isPublished,  setIsPublished]  = useState(lesson?.isPublished ?? false);
+  const [saving,       setSaving]       = useState(false);
 
-  const needsContent = lessonMode === 'content' || lessonMode === 'content_and_simulation';
-  const needsSim     = lessonMode === 'simulation' || lessonMode === 'content_and_simulation';
+  const needsContent = CONTENT_MODES.includes(lessonMode);
+  const needsSim     = SIM_MODES.includes(lessonMode);
+  const needsQuiz    = QUIZ_MODES.includes(lessonMode);
+  const modeInfo     = LESSON_MODE_OPTIONS.find(o => o.value === lessonMode);
 
-  const reset = () => {
-    setTitle(''); setLessonMode('content'); setContentType('rich_text');
-    setContent({}); setSelectedSim(null); setEstMins(null); setIsRequired(true);
+  const changeMode = (mode: LessonMode) => {
+    setLessonMode(mode);
+    // A new lesson starts each mode clean; an existing lesson keeps what it has.
+    if (!isEdit) { setContent({}); setSelectedSim(initialSimulationId ?? null); setSelectedQuiz(null); }
   };
-
-  const handleAdd = async () => {
-    if (!title.trim()) { message.error('Lesson title is required.'); return; }
-    if (needsSim && !selectedSim) { message.error('Select a simulation.'); return; }
-    if (needsContent && !contentType) { message.error('Select a content type.'); return; }
-
-    setSaving(true);
-    try {
-      await createLesson(courseId, moduleId, {
-        title:        title.trim(),
-        lessonMode,
-        contentType:  needsContent ? contentType : null,
-        content:      needsContent ? content : {},
-        simulationId: needsSim ? selectedSim : null,
-        estimatedMinutes: estMins,
-        isRequired,
-      });
-      message.success('Lesson added.');
-      onAdded();
-      onClose();
-      reset();
-    } catch (err: unknown) {
-      const e = err as { detail?: string; title?: string };
-      message.error(e.detail ?? e.title ?? 'Failed to add lesson.');
-    } finally { setSaving(false); }
-  };
-
-  return (
-    <Modal
-      open={open}
-      title="Add Lesson"
-      onCancel={() => { onClose(); reset(); }}
-      onOk={handleAdd}
-      okText="Add Lesson"
-      confirmLoading={saving}
-      width={700}
-      destroyOnHidden
-    >
-      <Form layout="vertical" style={{ marginTop: 8 }}>
-        <Form.Item label="Lesson Title" required>
-          <Input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Introduction to Pump Curves"
-          />
-        </Form.Item>
-
-        <Form.Item label="Lesson Mode" required>
-          <Radio.Group
-            value={lessonMode}
-            onChange={e => { setLessonMode(e.target.value); setContent({}); setSelectedSim(null); }}
-            style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
-          >
-            {LESSON_MODE_OPTIONS.map(opt => (
-              <Radio.Button
-                key={opt.value}
-                value={opt.value}
-                style={{ height: 'auto', padding: '6px 14px' }}
-              >
-                <span style={{ color: lessonMode === opt.value ? MODE_COLOR[opt.value] : undefined }}>
-                  {opt.icon}
-                </span>
-                {' '}{opt.label}
-              </Radio.Button>
-            ))}
-          </Radio.Group>
-          <Text type="secondary" style={{ fontSize: 12, marginTop: 4, display: 'block' }}>
-            {LESSON_MODE_OPTIONS.find(o => o.value === lessonMode)?.description}
-          </Text>
-        </Form.Item>
-
-        {needsContent && (
-          <>
-            <Form.Item label="Content Type" required>
-              <Radio.Group
-                value={contentType}
-                onChange={e => { setContentType(e.target.value); setContent({}); }}
-              >
-                {CONTENT_TYPE_OPTIONS.map(opt => (
-                  <Radio.Button key={opt.value} value={opt.value}>
-                    {opt.icon} {opt.label}
-                  </Radio.Button>
-                ))}
-              </Radio.Group>
-            </Form.Item>
-            <ContentEditor
-              contentType={contentType}
-              content={content}
-              onChange={setContent}
-            />
-          </>
-        )}
-
-        {needsSim && (
-          <Form.Item label="Simulation" required>
-            <SimulationPicker
-              courseId={courseId}
-              value={selectedSim}
-              onChange={setSelectedSim}
-            />
-          </Form.Item>
-        )}
-
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item label="Estimated time (min)">
-              <InputNumber
-                style={{ width: '100%' }}
-                min={1}
-                value={estMins ?? undefined}
-                onChange={v => setEstMins(v ?? null)}
-                placeholder="Optional"
-              />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item label="Required for completion">
-              <Switch checked={isRequired} onChange={setIsRequired} />
-            </Form.Item>
-          </Col>
-        </Row>
-      </Form>
-    </Modal>
-  );
-}
-
-// -- EditLessonModal ----------------------------------------------------------─
-
-function EditLessonModal({
-  open, lesson, courseId, moduleId, onClose, onUpdated,
-}: {
-  open: boolean; lesson: Lesson; courseId: string; moduleId: string;
-  onClose: () => void; onUpdated: () => void;
-}) {
-  const { message } = App.useApp();
-  const [title,       setTitle]       = useState(lesson.title);
-  const [lessonMode,  setLessonMode]  = useState<LessonMode>(lesson.lessonMode ?? 'content');
-  const [contentType, setContentType] = useState<ContentType>((lesson.contentType as ContentType) ?? 'rich_text');
-  const [content,     setContent]     = useState<Record<string, unknown>>(lesson.content ?? {});
-  const [selectedSim, setSelectedSim] = useState<string | null>(lesson.simulationId ?? null);
-  const [estMins,     setEstMins]     = useState<number | null>(lesson.estimatedMinutes ?? null);
-  const [isRequired,  setIsRequired]  = useState(lesson.isRequired);
-  const [isPublished, setIsPublished] = useState(lesson.isPublished);
-  const [saving,      setSaving]      = useState(false);
-
-  const needsContent = lessonMode === 'content' || lessonMode === 'content_and_simulation';
-  const needsSim     = lessonMode === 'simulation' || lessonMode === 'content_and_simulation';
 
   const handleSave = async () => {
     if (!title.trim()) { message.error('Lesson title is required.'); return; }
     if (needsSim && !selectedSim) { message.error('Select a simulation.'); return; }
+    if (needsQuiz && !selectedQuiz) { message.error('Select a quiz.'); return; }
+    if (!isEdit && needsContent && !contentType) { message.error('Select a content type.'); return; }
 
     setSaving(true);
     try {
-      await updateLesson(courseId, moduleId, lesson.id, {
+      const base = {
         title:        title.trim(),
         lessonMode,
         contentType:  needsContent ? contentType : null,
         content:      needsContent ? content : {},
         simulationId: needsSim ? selectedSim : null,
+        quizId:       needsQuiz ? selectedQuiz : null,
         estimatedMinutes: estMins,
         isRequired,
-        isPublished,
-      });
-      message.success('Lesson saved.');
-      onUpdated();
+      };
+      if (lesson) {
+        await updateLesson(courseId, moduleId, lesson.id, { ...base, isPublished });
+        message.success('Lesson saved.');
+      } else {
+        await createLesson(courseId, moduleId, base);
+        message.success('Lesson added.');
+      }
+      onSaved();
       onClose();
     } catch (err: unknown) {
       const e = err as { detail?: string; title?: string };
-      message.error(e.detail ?? e.title ?? 'Failed to save lesson.');
+      message.error(e.detail ?? e.title ?? (isEdit ? 'Failed to save lesson.' : 'Failed to add lesson.'));
     } finally { setSaving(false); }
   };
 
   return (
     <Modal
       open={open}
-      title="Edit Lesson"
+      title={isEdit ? 'Edit Lesson' : 'Add Lesson'}
       onCancel={onClose}
-      onOk={handleSave}
-      okText="Save"
-      confirmLoading={saving}
-      width={700}
+      width={760}
       destroyOnHidden
+      rootClassName={s.page}
+      styles={{ body: { maxHeight: 'calc(100vh - 230px)', overflowY: 'auto', paddingRight: 4 } }}
+      footer={
+        <div className={s.modalFooter}>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={handleSave}>
+            {isEdit ? 'Save Lesson' : 'Add Lesson'}
+          </Button>
+        </div>
+      }
     >
-      <Form layout="vertical" style={{ marginTop: 8 }}>
-        <Form.Item label="Lesson Title" required>
-          <Input value={title} onChange={e => setTitle(e.target.value)} />
-        </Form.Item>
+      <Form layout="vertical" requiredMark={false} className={s.lessonForm}>
+        <section className={s.modalSection}>
+          <Form.Item label="Lesson Title" required style={{ marginBottom: 0 }}>
+            <Input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Introduction to Pump Curves"
+            />
+          </Form.Item>
+        </section>
 
-        <Form.Item label="Lesson Mode">
-          <Radio.Group
-            value={lessonMode}
-            onChange={e => setLessonMode(e.target.value)}
-            style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
-          >
-            {LESSON_MODE_OPTIONS.map(opt => (
-              <Radio.Button
-                key={opt.value}
-                value={opt.value}
-                style={{ height: 'auto', padding: '6px 14px' }}
-              >
-                <span style={{ color: lessonMode === opt.value ? MODE_COLOR[opt.value] : undefined }}>
-                  {opt.icon}
-                </span>
-                {' '}{opt.label}
-              </Radio.Button>
-            ))}
-          </Radio.Group>
-        </Form.Item>
+        <section className={s.modalSection} aria-labelledby="lesson-mode-title">
+          <h4 className={s.modalSectionTitle} id="lesson-mode-title">Lesson Mode</h4>
+          <div className={s.modeGrid} role="radiogroup" aria-labelledby="lesson-mode-title">
+            {LESSON_MODE_OPTIONS.map(opt => {
+              const active = lessonMode === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={`${s.modeOption} ${active ? s.modeOptionActive : ''}`}
+                  onClick={() => changeMode(opt.value)}
+                >
+                  <span className={s.modeOptionIcon} aria-hidden>{opt.icon}</span>
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+          {modeInfo && <p className={s.modalHelp}>{modeInfo.description}</p>}
+        </section>
 
         {needsContent && (
-          <>
+          <section className={s.modalSection} aria-labelledby="lesson-content-title">
+            <h4 className={s.modalSectionTitle} id="lesson-content-title">Content</h4>
             <Form.Item label="Content Type">
-              <Radio.Group
+              <Segmented
                 value={contentType}
-                onChange={e => { setContentType(e.target.value); setContent({}); }}
-              >
-                {CONTENT_TYPE_OPTIONS.map(opt => (
-                  <Radio.Button key={opt.value} value={opt.value}>
-                    {opt.icon} {opt.label}
-                  </Radio.Button>
-                ))}
-              </Radio.Group>
+                onChange={v => { setContentType(v as ContentType); setContent({}); }}
+                options={CONTENT_TYPE_OPTIONS.map(opt => ({ value: opt.value, label: opt.label, icon: opt.icon }))}
+              />
             </Form.Item>
-            <ContentEditor
-              contentType={contentType}
-              content={content}
-              onChange={setContent}
-            />
-          </>
+            <ContentEditor contentType={contentType} content={content} onChange={setContent} />
+          </section>
         )}
 
         {needsSim && (
-          <Form.Item label="Simulation">
-            <SimulationPicker
-              courseId={courseId}
-              value={selectedSim}
-              onChange={setSelectedSim}
-            />
-          </Form.Item>
+          <section className={s.modalSection} aria-labelledby="lesson-sim-title">
+            <h4 className={s.modalSectionTitle} id="lesson-sim-title">Simulation</h4>
+            <SimulationPicker courseId={courseId} value={selectedSim} onChange={setSelectedSim} />
+          </section>
         )}
 
-        <Row gutter={16}>
-          <Col span={8}>
-            <Form.Item label="Estimated time (min)">
-              <InputNumber
-                style={{ width: '100%' }}
-                min={1}
-                value={estMins ?? undefined}
-                onChange={v => setEstMins(v ?? null)}
-              />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="Required">
-              <Switch checked={isRequired} onChange={setIsRequired} />
-            </Form.Item>
-          </Col>
-          <Col span={8}>
-            <Form.Item label="Published">
-              <Switch checked={isPublished} onChange={setIsPublished} />
-            </Form.Item>
-          </Col>
-        </Row>
+        {needsQuiz && (
+          <section className={s.modalSection} aria-labelledby="lesson-quiz-title">
+            <h4 className={s.modalSectionTitle} id="lesson-quiz-title">Quiz</h4>
+            <QuizPicker courseId={courseId} value={selectedQuiz} onChange={setSelectedQuiz} />
+          </section>
+        )}
+
+        <section className={s.modalSection} aria-labelledby="lesson-completion-title">
+          <h4 className={s.modalSectionTitle} id="lesson-completion-title">Completion</h4>
+          <Row gutter={16}>
+            <Col xs={24} sm={isEdit ? 8 : 12}>
+              <Form.Item label="Duration (min)" style={{ marginBottom: 0 }}>
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={1}
+                  value={estMins ?? undefined}
+                  onChange={v => setEstMins(v ?? null)}
+                  placeholder="Optional"
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={isEdit ? 8 : 12}>
+              <Form.Item label="Required for completion" style={{ marginBottom: 0 }}>
+                <Switch checked={isRequired} onChange={setIsRequired} />
+              </Form.Item>
+            </Col>
+            {isEdit && (
+              <Col xs={12} sm={8}>
+                <Form.Item label="Published" style={{ marginBottom: 0 }}>
+                  <Switch checked={isPublished} onChange={setIsPublished} />
+                </Form.Item>
+              </Col>
+            )}
+          </Row>
+        </section>
       </Form>
     </Modal>
   );
@@ -584,65 +642,75 @@ function EditLessonModal({
 // -- LessonRow ----------------------------------------------------------------─
 
 function LessonRow({
-  lesson, courseId, moduleId, onDelete, onEdited, canEdit,
+  lesson, courseId, moduleId, onDelete, onEdited, canEdit, focused,
 }: {
   lesson: Lesson; courseId: string; moduleId: string;
   onDelete: () => void; onEdited: () => void; canEdit: boolean;
+  /** Opened from a lesson's Edit link on the course overview (?lesson=). */
+  focused?: boolean;
 }) {
-  const [editOpen, setEditOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(!!focused && canEdit);
   const mode = lesson.lessonMode ?? 'content';
+  const contentLabel = lesson.contentType
+    ? CONTENT_TYPE_OPTIONS.find(o => o.value === lesson.contentType)?.label ?? lesson.contentType
+    : null;
+  // Meta line, not badges: content type and duration (max three badges per row).
+  const meta = [contentLabel, formatMinutes(lesson.estimatedMinutes)].filter(Boolean).join(' · ');
 
   return (
     <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
-        background: '#FAFAFA', border: '1px solid #E5E7EB', borderRadius: 6, marginTop: 4,
-      }}>
-        <span style={{ color: MODE_COLOR[mode], fontSize: 13 }}>
+      <div id={`lesson-${lesson.id}`} className={`${s.builderRow} ${focused ? s.builderRowFocused : ''}`}>
+        <span style={{ color: MODE_COLOR[mode], fontSize: 15 }} aria-hidden>
           {mode === 'simulation'
             ? <ExperimentOutlined />
-            : mode === 'content_and_simulation'
-              ? <MergeCellsOutlined />
-              : <FileTextOutlined />}
+            : mode === 'quiz'
+              ? <FormOutlined />
+              : mode.includes('_and_')
+                ? <MergeCellsOutlined />
+                : <FileTextOutlined />}
         </span>
-        <Text style={{ flex: 1, fontSize: 13 }}>{lesson.title}</Text>
-        <Tag color={MODE_TAG_COLOR[mode]} style={{ fontSize: 11 }}>
-          {MODE_LABEL[mode]}
-        </Tag>
-        {lesson.contentType && (
-          <Tag style={{ fontSize: 11, background: '#F3F4F6', color: '#374151' }}>
-            {lesson.contentType}
-          </Tag>
-        )}
-        {lesson.isRequired && <Tag color="red" style={{ fontSize: 11 }}>required</Tag>}
-        {!lesson.isPublished && <Tag style={{ fontSize: 11 }}>draft</Tag>}
-        {lesson.estimatedMinutes && (
-          <Text type="secondary" style={{ fontSize: 11 }}>{lesson.estimatedMinutes}min</Text>
-        )}
-        {canEdit && (
-          <>
-            <Tooltip title="Edit lesson">
-              <Button size="small" type="text" icon={<EditOutlined />} onClick={() => setEditOpen(true)} />
-            </Tooltip>
-            <Popconfirm
-              title="Delete this lesson?"
-              onConfirm={onDelete}
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger type="text" icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </>
-        )}
+        <div style={{ minWidth: 0 }}>
+          <div className={s.lessonTitle}>{lesson.title}</div>
+          <div className={s.metaRow} style={{ marginTop: 4 }}>
+            <LessonTypeChip mode={mode} small />
+            {lesson.isRequired && <Chip tone="neutral" className={s.chipSm}>Required</Chip>}
+            {!lesson.isPublished && <Chip tone="warning" className={s.chipSm}>Draft</Chip>}
+            {meta && <span className={s.meta}>{meta}</span>}
+          </div>
+        </div>
+        <div className={s.rowActions}>
+          <Link href={`/courses/${courseId}/home?activity=${lesson.id}`}>
+            <Button size="small" type="text" icon={<EyeOutlined />}>Preview</Button>
+          </Link>
+          {canEdit && (
+            <>
+              <Button size="small" icon={<EditOutlined />} onClick={() => setEditOpen(true)}>Edit</Button>
+              <Popconfirm
+                title="Delete this activity?"
+                description={`"${lesson.title}" will be removed from the module.`}
+                onConfirm={onDelete}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Button size="small" danger type="text" icon={<DeleteOutlined />}>Delete</Button>
+              </Popconfirm>
+            </>
+          )}
+        </div>
       </div>
 
       {editOpen && (
-        <EditLessonModal
+        <LessonFormModal
           open={editOpen}
           lesson={lesson}
           courseId={courseId}
           moduleId={moduleId}
-          onClose={() => setEditOpen(false)}
-          onUpdated={() => { onEdited(); setEditOpen(false); }}
+          onClose={() => {
+            setEditOpen(false);
+            // Opened from the course overview: land on the row once the modal closes.
+            if (focused) document.getElementById(`lesson-${lesson.id}`)?.scrollIntoView({ block: 'center' });
+          }}
+          onSaved={onEdited}
         />
       )}
     </>
@@ -724,14 +792,19 @@ function ModuleLockModal({
 // -- ModuleCard ----------------------------------------------------------------
 
 function ModuleCard({
-  mod, courseId, allModules, onDeleted, onRefresh, canEdit,
+  mod, index, courseId, allModules, onDeleted, onRefresh, canEdit, focusLessonId, addSimId,
 }: {
-  mod: CourseModule; courseId: string; allModules: CourseModule[];
+  mod: CourseModule; index: number; courseId: string; allModules: CourseModule[];
   onDeleted: () => void; onRefresh: () => void; canEdit: boolean;
+  /** Lesson to open for editing on arrival (?lesson=). */
+  focusLessonId?: string | null;
+  /** Simulation chosen on the Simulations page (?addSim=) — offer "Add simulation here". */
+  addSimId?: string | null;
 }) {
   const { message } = App.useApp();
-  const [expanded,     setExpanded]     = useState(false);
+  const [expanded,     setExpanded]     = useState(true);
   const [addOpen,      setAddOpen]      = useState(false);
+  const [addWithSim,   setAddWithSim]   = useState(false);
   const [lockOpen,     setLockOpen]     = useState(false);
   const [editOpen,     setEditOpen]     = useState(false);
   const [editTitle,    setEditTitle]    = useState(mod.title);
@@ -774,92 +847,90 @@ function ModuleCard({
   };
 
   const isLocked = !!(mod.unlockAt || mod.prerequisiteModuleId);
+  const openAdd = (withSim: boolean) => { setAddWithSim(withSim); setAddOpen(true); };
 
   return (
-    <Card
-      size="small"
-      style={{ marginBottom: 10, border: '1px solid #D1D5DB' }}
-      styles={{ body: { padding: '10px 14px' } }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <section className={`${s.panel} ${s.builderModule}`} aria-label={`Module ${index + 1}: ${mod.title}`}>
+      <div className={s.builderModuleHead}>
         <Button
           type="text"
           size="small"
           icon={expanded ? <DownOutlined /> : <RightOutlined />}
           onClick={() => setExpanded(v => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Collapse module' : 'Expand module'}
         />
+        <span className={s.moduleIndex}>{index + 1}</span>
 
-        {editOpen && canEdit ? (
-          <Input
-            size="small"
-            style={{ flex: 1 }}
-            value={editTitle}
-            onChange={e => setEditTitle(e.target.value)}
-            onPressEnter={handleEditTitle}
-            onBlur={() => setEditOpen(false)}
-            autoFocus
-          />
-        ) : (
-          <Text
-            strong
-            style={{ flex: 1, cursor: canEdit ? 'pointer' : undefined }}
-            onClick={() => canEdit && setEditOpen(true)}
-          >
-            {mod.title}
-          </Text>
-        )}
-
-        {editOpen && canEdit && (
-          <Button size="small" loading={editSaving} onClick={handleEditTitle}>Save</Button>
-        )}
-
-        <Tag style={{ fontSize: 11, background: '#F3F4F6', color: '#374151' }}>
-          {lessons.length} lesson{lessons.length !== 1 ? 's' : ''}
-        </Tag>
-        {canEdit ? (
-          <Tooltip title={mod.isPublished ? 'Click to set as draft' : 'Click to publish'}>
-            <Space size={4}>
-              <Switch
+        <div className={s.builderModuleTitle}>
+          {editOpen && canEdit ? (
+            <Space.Compact style={{ width: '100%' }}>
+              <Input
                 size="small"
-                checked={mod.isPublished}
-                loading={toggleLoad}
-                onChange={handleTogglePublish}
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                onPressEnter={handleEditTitle}
+                onKeyDown={e => { if (e.key === 'Escape') setEditOpen(false); }}
+                autoFocus
+                aria-label="Module title"
               />
-              <Text style={{ fontSize: 11, color: mod.isPublished ? '#16A34A' : '#6B7280' }}>
-                {mod.isPublished ? 'Published' : 'Draft'}
-              </Text>
-            </Space>
-          </Tooltip>
-        ) : (
-          mod.isPublished
-            ? <Tag color="green" style={{ fontSize: 11 }}>Published</Tag>
-            : <Tag style={{ fontSize: 11 }}>Draft</Tag>
-        )}
-        {isLocked && (
-          <Tooltip title={mod.unlockAt ? `Unlocks ${new Date(mod.unlockAt).toLocaleDateString()}` : 'Has prerequisite'}>
-            <LockOutlined style={{ color: '#F59E0B', fontSize: 13 }} />
-          </Tooltip>
-        )}
-        {canEdit && (
-          <Space size={2}>
-            <Tooltip title="Lock / unlock settings">
-              <Button size="small" type="text" icon={<LockOutlined />} onClick={() => setLockOpen(true)} />
+              <Button size="small" type="primary" loading={editSaving} onClick={handleEditTitle}>Save</Button>
+              <Button size="small" onClick={() => { setEditOpen(false); setEditTitle(mod.title); }}>Cancel</Button>
+            </Space.Compact>
+          ) : (
+            <>
+              <span className={s.moduleTitle}>{mod.title}</span>
+              <span className={s.meta}>
+                {lessons.length} activit{lessons.length !== 1 ? 'ies' : 'y'}
+                {isLocked && (
+                  <> · <LockOutlined /> {mod.unlockAt ? `Unlocks ${formatDate(mod.unlockAt)}` : 'Has a prerequisite'}</>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+
+        <div className={s.builderModuleActions}>
+          {canEdit ? (
+            <Tooltip title={mod.isPublished ? 'Students can see this module. Switch off to set it to draft.' : 'Hidden from students. Switch on to publish.'}>
+              <label className={s.publishToggle}>
+                <Switch size="small" checked={mod.isPublished} loading={toggleLoad} onChange={handleTogglePublish} />
+                <span style={{ color: mod.isPublished ? 'var(--sl-success)' : 'var(--sl-text-secondary)' }}>
+                  {mod.isPublished ? 'Published' : 'Draft'}
+                </span>
+              </label>
             </Tooltip>
-            <Popconfirm
-              title="Delete this module and all its lessons?"
-              onConfirm={onDeleted}
-              okButtonProps={{ danger: true }}
-            >
-              <Button size="small" danger type="text" icon={<DeleteOutlined />} />
-            </Popconfirm>
-          </Space>
-        )}
+          ) : (
+            mod.isPublished
+              ? <Chip tone="success" className={s.chipSm}>Published</Chip>
+              : <Chip tone="warning" className={s.chipSm}>Draft</Chip>
+          )}
+          {canEdit && !editOpen && (
+            <>
+              <Tooltip title="Rename module">
+                <Button size="small" type="text" icon={<EditOutlined />} aria-label="Rename module" onClick={() => setEditOpen(true)} />
+              </Tooltip>
+              <Tooltip title="Release date and prerequisite">
+                <Button size="small" type="text" icon={<LockOutlined />} aria-label="Lock settings" onClick={() => setLockOpen(true)} />
+              </Tooltip>
+              <Popconfirm
+                title="Delete this module?"
+                description={`"${mod.title}" and all its activities will be removed. This cannot be undone.`}
+                onConfirm={onDeleted}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Button size="small" danger type="text" icon={<DeleteOutlined />} aria-label="Delete module" />
+              </Popconfirm>
+            </>
+          )}
+        </div>
       </div>
 
       {expanded && (
-        <div style={{ marginTop: 10, paddingLeft: 28 }}>
+        <div className={s.builderModuleBody}>
           {!lessons.length && (
-            <Text type="secondary" style={{ fontSize: 12 }}>No lessons yet.</Text>
+            <p className={s.meta} style={{ margin: '4px 0 0' }}>No activities yet. Add the first one below.</p>
           )}
           {lessons.map(l => (
             <LessonRow
@@ -868,31 +939,34 @@ function ModuleCard({
               courseId={courseId}
               moduleId={mod.id}
               canEdit={canEdit}
+              focused={l.id === focusLessonId}
               onDelete={() => handleDeleteLesson(l.id)}
               onEdited={onRefresh}
             />
           ))}
           {canEdit && (
-            <Button
-              type="dashed"
-              size="small"
-              icon={<PlusOutlined />}
-              style={{ marginTop: 8 }}
-              onClick={() => setAddOpen(true)}
-            >
-              Add Lesson
-            </Button>
+            <div className={s.actionRow} style={{ marginTop: 10 }}>
+              <Button type="dashed" size="small" icon={<PlusOutlined />} onClick={() => openAdd(false)}>
+                Add Activity
+              </Button>
+              {addSimId && (
+                <Button size="small" icon={<ExperimentOutlined />} onClick={() => openAdd(true)}>
+                  Add simulation here
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
 
       {addOpen && (
-        <AddLessonModal
+        <LessonFormModal
           open={addOpen}
           courseId={courseId}
           moduleId={mod.id}
+          initialSimulationId={addWithSim ? addSimId : null}
           onClose={() => setAddOpen(false)}
-          onAdded={onRefresh}
+          onSaved={onRefresh}
         />
       )}
 
@@ -906,13 +980,20 @@ function ModuleCard({
           onSaved={onRefresh}
         />
       )}
-    </Card>
+    </section>
   );
 }
 
 // -- CourseBuilder ------------------------------------------------------------─
 
-function CourseBuilder({ courseId, canEdit }: { courseId: string; canEdit: boolean }) {
+function CourseBuilder({
+  courseId, canEdit, focusLessonId, addSimId, onClearAddSim,
+}: {
+  courseId: string; canEdit: boolean;
+  focusLessonId?: string | null;
+  addSimId?: string | null;
+  onClearAddSim: () => void;
+}) {
   const { message } = App.useApp();
   const [modules,  setModules]  = useState<CourseModule[]>([]);
   const [loading,  setLoading]  = useState(true);
@@ -956,20 +1037,23 @@ function CourseBuilder({ courseId, canEdit }: { courseId: string; canEdit: boole
     <div style={{ textAlign: 'center', padding: 40 }}><Spin /></div>
   );
 
+  const lessonsAll = modules.flatMap(m => m.lessons ?? []);
+  const simCount   = lessonsAll.filter(l => l.lessonMode?.includes('simulation')).length;
+  const quizCount  = lessonsAll.filter(l => l.lessonMode?.includes('quiz')).length;
+
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-        <div>
-          <Text strong style={{ fontSize: 15 }}>
-            <UnorderedListOutlined style={{ marginRight: 6 }} />
-            Modules &amp; Lessons
-          </Text>
-          <div>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              Each lesson can be content-only, simulation-only, or both.
-              Simulations are filtered by this course&apos;s department catalog.
-            </Text>
-          </div>
+      <div className={`${s.panel} ${s.builderHead}`}>
+        <div style={{ minWidth: 0 }}>
+          <h2 className={s.sectionTitle} style={{ margin: 0 }}>Course Content</h2>
+          <p className={s.meta} style={{ margin: '4px 0 0' }}>
+            {modules.length} module{modules.length !== 1 ? 's' : ''} · {lessonsAll.length} activit{lessonsAll.length !== 1 ? 'ies' : 'y'}
+            {' · '}{simCount} simulation{simCount !== 1 ? 's' : ''} · {quizCount} quiz{quizCount !== 1 ? 'zes' : ''}
+          </p>
+          <p className={s.meta} style={{ margin: '2px 0 0' }}>
+            An activity can be content, an interactive simulation, a quiz, or a combination.
+            Simulations come from this course&apos;s department catalog. Changes here save as you make them.
+          </p>
         </div>
         {canEdit && (
           <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddOpen(true)}>
@@ -978,21 +1062,45 @@ function CourseBuilder({ courseId, canEdit }: { courseId: string; canEdit: boole
         )}
       </div>
 
-      {!modules.length && (
-        <Empty description="No modules yet. Add the first module to start building this course." />
+      {addSimId && canEdit && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<ExperimentOutlined />}
+          style={{ marginBottom: 12 }}
+          title={modules.length
+            ? 'Choose the module for your simulation, then select “Add simulation here”.'
+            : 'Add a module first, then add your simulation to it.'}
+          action={<Button size="small" type="text" onClick={onClearAddSim}>Dismiss</Button>}
+        />
       )}
 
-      {modules.map(mod => (
+      {!modules.length && (
+        <div className={s.panel} style={{ padding: 24 }}>
+          <Empty description="No modules yet. Add the first module to start building this course." />
+        </div>
+      )}
+
+      {modules.map((mod, i) => (
         <ModuleCard
           key={mod.id}
           mod={mod}
+          index={i}
           courseId={courseId}
           allModules={modules}
           canEdit={canEdit}
+          focusLessonId={focusLessonId}
+          addSimId={addSimId}
           onDeleted={() => handleDeleteModule(mod.id)}
           onRefresh={load}
         />
       ))}
+
+      {canEdit && modules.length > 0 && (
+        <Button type="dashed" block icon={<PlusOutlined />} onClick={() => setAddOpen(true)} style={{ marginTop: 4 }}>
+          Add Module
+        </Button>
+      )}
 
       <Modal
         open={addOpen}
@@ -1044,7 +1152,17 @@ export default function EditCoursePage({ params }: Props) {
   const canEdit     = isAdmin || isOwnCourse;
   const canDelete   = isAdmin;
 
-  const deptName      = departments.find(d => d.id === course?.departmentId)?.name;
+  // Readable names even when the lookup lists fail to load (never show raw IDs).
+  const deptName      = departments.find(d => d.id === course?.departmentId)?.name ?? course?.departmentName ?? undefined;
+  const searchParams  = useSearchParams();
+  // Deep links: ?lesson= opens that lesson's editor; ?addSim= comes from Add to Course.
+  const focusLessonId = searchParams.get('lesson');
+  const [addSimId, setAddSimId] = useState<string | null>(searchParams.get('addSim'));
+  const [activeTab, setActiveTab] = useState(
+    searchParams.get('tab') === 'builder' || focusLessonId || addSimId ? 'builder' : 'settings',
+  );
+  const [thumbEditing, setThumbEditing] = useState(false);
+  const watchedThumb  = Form.useWatch('thumbnailUrl', form) as string | undefined;
   const watchedDeptId = Form.useWatch('departmentId', form) as string | undefined;
   const watchedYearId = Form.useWatch('academicYearId', form) as string | undefined;
 
@@ -1186,11 +1304,34 @@ export default function EditCoursePage({ params }: Props) {
     </div></>;
   }
 
+  // Current value first if the loaded list doesn't contain it, so selects show names, not IDs.
+  const withCurrent = (
+    opts: { value: string; label: string }[], value?: string | null, label?: string | null,
+  ) => (value && label && !opts.some(o => o.value === value) ? [{ value, label }, ...opts] : opts);
+
+  const deptOptions = withCurrent(
+    departments.map(d => ({ value: d.id, label: d.code ? `${d.name} (${d.code})` : d.name })),
+    course.departmentId, course.departmentName,
+  );
+  const yearOptions = withCurrent(
+    academicYears.map(y => ({ value: y.id, label: y.name })),
+    course.academicYearId, course.academicYearName,
+  );
+  const termOptions = withCurrent(
+    terms.map(t => ({ value: t.id, label: t.name })),
+    course.semesterTermId, course.semesterTermName,
+  );
+  const yearName = academicYears.find(y => y.id === course.academicYearId)?.name ?? course.academicYearName;
+  const termName = terms.find(t => t.id === course.semesterTermId)?.name ?? course.semesterTermName;
+  const thumbIsData = !!watchedThumb?.startsWith('data:');
+
   const settingsTab = (
-    <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-      <div style={{ flex: '1 1 460px', minWidth: 0 }}>
-        <Card>
-          <Form form={form} layout="vertical" onFinish={handleSave} requiredMark={false}>
+    <Form form={form} layout="vertical" onFinish={handleSave} requiredMark={false}>
+      <div className={s.editGrid}>
+        <div className={s.editMain}>
+          {/* A — Basic information */}
+          <section className={`${s.panel} ${s.formSection}`} aria-labelledby="sec-basic">
+            <h3 className={s.formSectionTitle} id="sec-basic">Basic Information</h3>
             <Form.Item
               label="Course Title"
               name="title"
@@ -1203,8 +1344,47 @@ export default function EditCoursePage({ params }: Props) {
               <TextArea rows={4} showCount maxLength={2000} />
             </Form.Item>
 
+            <Form.Item label="Thumbnail" style={{ marginBottom: 0 }}>
+              <div className={s.thumbField}>
+                <div
+                  className={s.thumbPreview}
+                  style={watchedThumb ? { backgroundImage: `url(${watchedThumb})` } : undefined}
+                  aria-label={watchedThumb ? 'Current thumbnail' : 'No thumbnail'}
+                >
+                  {!watchedThumb && <PictureOutlined />}
+                </div>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>
+                    {watchedThumb
+                      ? (thumbIsData ? 'Embedded image' : 'Image from a web address')
+                      : 'No thumbnail yet. Students see a placeholder.'}
+                  </Text>
+                  <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 8 }}>
+                    Shown on course cards and the course overview. Use a 16:9 simulation screenshot.
+                  </Text>
+                  <Button size="small" icon={<PictureOutlined />} onClick={() => setThumbEditing(v => !v)}>
+                    {thumbEditing ? 'Done' : watchedThumb ? 'Replace thumbnail' : 'Add thumbnail'}
+                  </Button>
+                </div>
+              </div>
+            </Form.Item>
+            {/* The URL field stays mounted so the value is always submitted. */}
+            <Form.Item
+              name="thumbnailUrl"
+              label="Image address"
+              extra="Paste the web address of the image."
+              hidden={!thumbEditing}
+              style={{ marginTop: 12 }}
+            >
+              <Input placeholder="https://…" allowClear />
+            </Form.Item>
+          </section>
+
+          {/* B — Academic setup */}
+          <section className={`${s.panel} ${s.formSection}`} aria-labelledby="sec-academic">
+            <h3 className={s.formSectionTitle} id="sec-academic">Academic Setup</h3>
             <Row gutter={16}>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item
                   label="Department"
                   name="departmentId"
@@ -1216,11 +1396,11 @@ export default function EditCoursePage({ params }: Props) {
                     showSearch
                     optionFilterProp="label"
                     onChange={(v: string | undefined) => v ? loadYears(v) : (setAcadYears([]), setTerms([]))}
-                    options={departments.map(d => ({ value: d.id, label: `${d.name} (${d.code})` }))}
+                    options={deptOptions}
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item label="Academic Year" name="academicYearId">
                   <Select
                     placeholder="Select year"
@@ -1228,29 +1408,29 @@ export default function EditCoursePage({ params }: Props) {
                     loading={yearsLoading}
                     disabled={!watchedDeptId}
                     onChange={(v: string | undefined) => v ? loadTerms(v) : setTerms([])}
-                    options={academicYears.map(y => ({ value: y.id, label: y.name }))}
+                    options={yearOptions}
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col xs={24} md={8}>
                 <Form.Item label="Semester Term" name="semesterTermId">
                   <Select
                     placeholder="Select term"
                     allowClear
                     loading={termsLoading}
                     disabled={!watchedYearId}
-                    options={terms.map(t => ({ value: t.id, label: t.name }))}
+                    options={termOptions}
                   />
                 </Form.Item>
               </Col>
             </Row>
+          </section>
 
-            <Form.Item label="Thumbnail URL" name="thumbnailUrl">
-              <Input placeholder="https://…" />
-            </Form.Item>
-
+          {/* C — Enrollment settings */}
+          <section className={`${s.panel} ${s.formSection}`} aria-labelledby="sec-enroll">
+            <h3 className={s.formSectionTitle} id="sec-enroll">Enrollment Settings</h3>
             <Row gutter={16}>
-              <Col span={12}>
+              <Col xs={24} md={8}>
                 <Form.Item label="Enrollment Type" name="enrollmentType" rules={[{ required: true }]}>
                   <Select options={[
                     { value: 'open',     label: 'Open' },
@@ -1260,148 +1440,134 @@ export default function EditCoursePage({ params }: Props) {
                   ]} />
                 </Form.Item>
               </Col>
-              <Col span={12}>
+              <Col xs={24} md={8}>
+                <Form.Item label="Enrollment Cap" name="enrollmentCap" extra="Leave blank for unlimited">
+                  <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
                 <Form.Item label="Passing Grade (%)" name="passingGrade">
                   <InputNumber min={0} max={100} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
             </Row>
+          </section>
 
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item label="Enrollment Cap" name="enrollmentCap" extra="Leave blank for unlimited">
-                  <InputNumber min={1} style={{ width: '100%' }} placeholder="Unlimited" />
-                </Form.Item>
-              </Col>
-            </Row>
+          <div className={s.formFooter}>
+            <Link href={`/courses/${id}`}><Button size="large">Cancel</Button></Link>
+            <Button type="primary" htmlType="submit" loading={saving} size="large" icon={<SaveOutlined />}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
 
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
-              <Link href={`/courses/${id}`}><Button size="large">Cancel</Button></Link>
-              <Button type="primary" htmlType="submit" loading={saving} size="large" icon={<SaveOutlined />}>
-                Save Changes
-              </Button>
-            </div>
-          </Form>
-        </Card>
-      </div>
+        {/* D — Publishing */}
+        <aside className={s.editSide}>
+          <section className={`${s.panel} ${s.formSection}`} aria-labelledby="sec-publish">
+            <h3 className={s.formSectionTitle} id="sec-publish">Publishing</h3>
+            <dl className={s.railList} style={{ marginTop: 0 }}>
+              <dt>Status</dt><dd><StatusTag status={course.status} /></dd>
+              <dt>Department</dt><dd>{deptName ?? '—'}</dd>
+              {yearName && <><dt>Academic Year</dt><dd>{yearName}</dd></>}
+              {termName && <><dt>Semester</dt><dd>{termName}</dd></>}
+              <dt>Created</dt><dd>{formatDate(course.createdAt)}</dd>
+              {course.publishedAt && <><dt>Published</dt><dd>{formatDate(course.publishedAt)}</dd></>}
+            </dl>
 
-      <div style={{ width: 240, flexShrink: 0 }}>
-        <Card title="Publishing" size="small" style={{ marginBottom: 12 }}>
-          <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
-            <Descriptions.Item label="Status">
-              <StatusTag status={course.status} />
-            </Descriptions.Item>
-            <Descriptions.Item label="Department">
-              {deptName ? <Tag>{deptName}</Tag> : <Text type="secondary">—</Text>}
-            </Descriptions.Item>
-            {course.academicYearId && (
-              <Descriptions.Item label="Year">
-                <Text style={{ fontSize: 12 }}>
-                  {academicYears.find(y => y.id === course.academicYearId)?.name ?? '—'}
-                </Text>
-              </Descriptions.Item>
-            )}
-            {course.semesterTermId && (
-              <Descriptions.Item label="Term">
-                <Text style={{ fontSize: 12 }}>
-                  {terms.find(t => t.id === course.semesterTermId)?.name ?? '—'}
-                </Text>
-              </Descriptions.Item>
-            )}
-            <Descriptions.Item label="Created">
-              {new Date(course.createdAt).toLocaleDateString()}
-            </Descriptions.Item>
-            {course.publishedAt && (
-              <Descriptions.Item label="Published">
-                {new Date(course.publishedAt).toLocaleDateString()}
-              </Descriptions.Item>
-            )}
-          </Descriptions>
-
-          <Space orientation="vertical" style={{ width: '100%' }}>
-            {course.status !== 'published' && (
-              <Button
-                type="primary"
-                icon={<RocketOutlined />}
-                loading={actionBusy}
-                onClick={handlePublish}
-                block
-              >
-                Publish
-              </Button>
-            )}
-            {course.status !== 'archived' && (
-              <Button
-                icon={<InboxOutlined />}
-                loading={actionBusy}
-                onClick={handleArchive}
-                block
-              >
-                Archive
-              </Button>
-            )}
-          </Space>
-
-          {canDelete && (
-            <>
-              <Divider style={{ margin: '16px 0' }} />
-              <Text type="danger" style={{ display: 'block', fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
-                Danger Zone
-              </Text>
-              <Popconfirm
-                title="Delete course?"
-                description="This action cannot be undone."
-                onConfirm={handleDelete}
-                okText="Delete"
-                okButtonProps={{ danger: true }}
-              >
-                <Button danger icon={<DeleteOutlined />} loading={actionBusy} block>
-                  Delete Course
+            <div className={s.railActions} style={{ marginTop: 14 }}>
+              {course.status !== 'published' && (
+                <Button icon={<RocketOutlined />} loading={actionBusy} onClick={handlePublish} block>
+                  Publish Course
                 </Button>
-              </Popconfirm>
-            </>
-          )}
-        </Card>
+              )}
+              {course.status !== 'archived' && (
+                <Button icon={<InboxOutlined />} loading={actionBusy} onClick={handleArchive} block>
+                  Archive
+                </Button>
+              )}
+            </div>
+
+            {canDelete && (
+              <>
+                <Divider style={{ margin: '16px 0 10px' }} />
+                <Text type="danger" style={{ display: 'block', fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
+                  Danger Zone
+                </Text>
+                <Popconfirm
+                  title="Delete course?"
+                  description="This action cannot be undone."
+                  onConfirm={handleDelete}
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                >
+                  <Button danger icon={<DeleteOutlined />} loading={actionBusy} block>
+                    Delete Course
+                  </Button>
+                </Popconfirm>
+              </>
+            )}
+          </section>
+        </aside>
       </div>
-    </div>
+    </Form>
   );
 
   const tabItems = [
     {
       key:      'settings',
-      label:    'Settings',
+      label:    <span><SettingOutlined style={{ marginRight: 6 }} />Settings</span>,
       children: settingsTab,
     },
     {
       key:   'builder',
-      label: (
-        <span>
-          <AppstoreOutlined style={{ marginRight: 4 }} />
-          Builder
-        </span>
+      label: <span><AppstoreOutlined style={{ marginRight: 6 }} />Builder</span>,
+      children: (
+        <CourseBuilder
+          courseId={id}
+          canEdit={canEdit}
+          focusLessonId={focusLessonId}
+          addSimId={addSimId}
+          onClearAddSim={() => { setAddSimId(null); router.replace(`/courses/${id}/edit?tab=builder`, { scroll: false }); }}
+        />
       ),
-      children: <CourseBuilder courseId={id} canEdit={canEdit} />,
     },
   ];
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto' }}>
-      {/* <Breadcrumb
-        style={{ marginBottom: 20 }}
-        items={[
-          { title: <Link href="/courses">Courses</Link> },
-          { title: <Link href={`/courses/${id}`}>{course.title}</Link> },
-          { title: 'Edit' },
-        ]}
-      /> */}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <Title level={4} style={{ margin: 0 }}>Edit Course</Title>
-        <StatusTag status={course.status} />
-        {deptName && <Tag color="blue">{deptName}</Tag>}
+    <div className={s.page} style={{ maxWidth: 1120, margin: '0 auto' }}>
+      {/* Sticky header — the main action (Save Changes) is always visible */}
+      <div className={`${s.panel} ${s.editBar}`}>
+        <div style={{ minWidth: 0 }}>
+          <div className={s.metaRow}>
+            <Title level={4} style={{ margin: 0 }}>Edit Course</Title>
+            <StatusTag status={course.status} />
+            {course.code && <Chip tone="info">{course.code}</Chip>}
+          </div>
+          <span className={s.meta}>
+            {course.title}{deptName ? ` · ${deptName}` : ''}{termName ? ` · ${termName}` : ''}
+          </span>
+        </div>
+        <div className={s.editBarActions}>
+          <Link href={`/courses/${id}`}><Button>Cancel</Button></Link>
+          <Link href={`/courses/${id}/home`}><Button icon={<EyeOutlined />}>Preview Course</Button></Link>
+          <Link href={`/courses/${id}/grade`}><Button icon={<CheckSquareOutlined />}>Grade Submissions</Button></Link>
+          {activeTab === 'settings' ? (
+            <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => form.submit()}>
+              Save Changes
+            </Button>
+          ) : (
+            <span className={s.autosaveNote}><CheckCircleFilled aria-hidden /> Builder changes save automatically</span>
+          )}
+        </div>
       </div>
 
-      <Tabs items={tabItems} destroyInactiveTabPane={false} />
+      <Tabs
+        className={s.editTabs}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={tabItems}
+        destroyInactiveTabPane={false}
+      />
     </div>
   );
 }

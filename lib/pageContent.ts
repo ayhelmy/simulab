@@ -5,6 +5,7 @@
  */
 
 import { api } from './api';
+import type { Simulation } from '@/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,6 +34,71 @@ export interface PlatformStats {
 }
 
 export type PageContentMap = Record<string, PageContentItem[]>;
+
+// ── Home page ─────────────────────────────────────────────────────────────────
+
+export interface HeroExtra {
+  badgeText?: string;
+  highlightedText?: string;
+  primaryButtonLabel?: string;
+  primaryButtonUrl?: string;
+  secondaryButtonLabel?: string;
+  secondaryButtonUrl?: string;
+  heroImageUrl?: string | null;
+  backgroundImageUrl?: string | null;
+  /** Highlight stat chips shown under the hero CTAs, e.g. { value: "19+", label: "Simulations" }. */
+  badges?: { value: string; label: string; icon?: string }[];
+}
+
+export interface DemoExtra {
+  thumbnailUrl?: string | null;
+  videoUrl?: string | null;
+  sampleSimulationId?: string | null;
+  watchButtonLabel?: string;
+  launchButtonLabel?: string;
+}
+
+export interface CtaExtra {
+  backgroundImageUrl?: string | null;
+  primaryButtonLabel?: string;
+  primaryButtonUrl?: string;
+  secondaryButtonLabel?: string;
+  secondaryButtonUrl?: string;
+}
+
+export interface StatCard {
+  label: string;
+  value: string;
+  shortDescription: string | null;
+  icon: string | null;
+}
+
+export interface FeaturedSimulationCard extends Simulation {
+  discipline: string | null;
+}
+
+export interface HomePagePayload {
+  hero: PageContentItem | null;
+  statistics: StatCard[];
+  features: {
+    intro: PageContentItem | null;
+    cards: PageContentItem[];
+  };
+  featuredSimulations: {
+    intro: PageContentItem | null;
+    items: FeaturedSimulationCard[];
+  };
+  demo: PageContentItem | null;
+  benefits: {
+    intro: PageContentItem | null;
+    cards: PageContentItem[];
+  };
+  lms: {
+    intro: PageContentItem | null;
+    cards: PageContentItem[];
+  };
+  callToAction: PageContentItem | null;
+}
 
 export interface CreatePageContentData {
   page: string;
@@ -63,6 +129,12 @@ export async function getPageContent(page: string): Promise<PageContentMap> {
 /** Fetch live platform statistics from the database. */
 export async function getPlatformStats(): Promise<PlatformStats> {
   const res = await api.get<PlatformStats>('/page-content/stats');
+  return res.data;
+}
+
+/** Fetch the full public home page payload in a single call. */
+export async function getHomePageData(): Promise<HomePagePayload> {
+  const res = await api.get<HomePagePayload>('/page-content/home-page');
   return res.data;
 }
 

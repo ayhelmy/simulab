@@ -75,7 +75,6 @@ export default function PublicSimPlayPage({ params }: Props) {
   }, []);
 
   const backHref = `/sim/${simulationId}`;
-  const iframeSrc = launchInfo ? normalizeSecureUrl(launchInfo.launchUrl) : '';
 
   // -- Loading ------------------------------------------------------------------─
 
@@ -203,7 +202,7 @@ export default function PublicSimPlayPage({ params }: Props) {
       >
         <iframe
           ref={iframeRef}
-          src={iframeSrc}
+          src={normalizeSecureUrl(launchInfo.launchUrl)}
           title={launchInfo.title}
           allow="fullscreen; autoplay; clipboard-read; clipboard-write"
           style={{

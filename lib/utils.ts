@@ -26,6 +26,7 @@ export function getInitials(firstName: string, lastName: string): string {
   return `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
 }
 
+/** Upgrades non-local http:// URLs to https:// so iframes aren't blocked as mixed content. */
 export function normalizeSecureUrl(url: string | null | undefined): string {
   if (!url) return '';
 

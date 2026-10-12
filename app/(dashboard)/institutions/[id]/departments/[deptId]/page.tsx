@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { listAcademicYears, createAcademicYear, deleteAcademicYear } from '@/lib/academic-years';
 import { listSemesterTerms, createSemesterTerm, deleteSemesterTerm } from '@/lib/semester-terms';
 import { getDepartment, listDepartmentCatalogs, assignCatalogToDepartment, revokeCatalogFromDepartment } from '@/lib/departments';
-import { getAssignedCatalogTree, toTreeSelectData } from '@/lib/simulations';
+import { getInstitutionCatalogTree, toTreeSelectData } from '@/lib/simulations';
 import type { AcademicYear, SemesterTerm } from '@/types';
 import type { Department, DepartmentCatalogAssignment } from '@/lib/departments';
 import {
@@ -249,7 +249,7 @@ function CatalogsTab({ deptId, instId, canManage }: { deptId: string; instId: st
 
   const openAssign = async () => {
     try {
-      const tree = await getAssignedCatalogTree();
+      const tree = await getInstitutionCatalogTree(instId);
       setTreeData(toTreeSelectData(tree));
     } catch { setTreeData([]); }
     setAddOpen(true);

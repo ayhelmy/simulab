@@ -4,8 +4,8 @@
  */
 
 import { api, getAccessToken } from './api';
-import { API_BASE_URL } from './constants';
-import type { Simulation, SimulationCatalog, WebGLLaunchResult } from '@/types';
+import { API_BASE_URL, UPLOAD_API_URL } from './constants';
+import type { Simulation, SimulationCatalog, SimulationDetail, WebGLLaunchResult } from '@/types';
 import type { PaginationMeta } from '@/types/api';
 
 // ── Query / input types ───────────────────────────────────────────────────────
@@ -65,6 +65,8 @@ export interface CatalogItem {
   estimatedMinutes?: number | null;
   difficulty: Simulation['difficulty'];
   learningObjectives: string[];
+  isFeatured?: boolean;
+  featuredOrder?: number | null;
   addedAt: string;
 }
 
@@ -187,8 +189,8 @@ export async function listDemoSimulationsPaginated(
   };
 }
 
-export async function getSimulation(id: string): Promise<Simulation> {
-  const res = await api.get<Simulation>(`/simulations/${id}`);
+export async function getSimulation(id: string): Promise<SimulationDetail> {
+  const res = await api.get<SimulationDetail>(`/simulations/${id}`);
   return res.data;
 }
 
@@ -202,8 +204,23 @@ export async function updateSimulation(id: string, data: UpdateSimulationData): 
   return res.data;
 }
 
+/** Permanently deletes a simulation (super_admin) — also unassigns it from every catalog. */
 export async function deleteSimulation(id: string): Promise<void> {
   await api.delete(`/simulations/${id}`);
+}
+
+export interface SimulationDeleteImpact {
+  simulation: { id: string; title: string };
+  catalogs: { id: string; name: string }[];
+  /** Courses whose lessons will be detached from this simulation (lessons are kept). */
+  courses: { id: string; title: string; lessonCount: number }[];
+  sessionCount: number;
+  scoreCount: number;
+}
+
+export async function getSimulationDeleteImpact(id: string): Promise<SimulationDeleteImpact> {
+  const res = await api.get<SimulationDeleteImpact>(`/simulations/${id}/delete-impact`);
+  return res.data;
 }
 
 export async function launchSimulation(id: string): Promise<LaunchResult> {
@@ -232,6 +249,17 @@ export async function getAssignedCatalogTree(): Promise<SimulationCatalog[]> {
   return res.data ?? [];
 }
 
+/**
+ * Returns the catalog tree assigned to a specific institution.
+ * Use this (instead of getAssignedCatalogTree) when acting on behalf of an
+ * institution that may not be the current user's own, e.g. a super_admin
+ * assigning catalogs to a department in an arbitrary institution.
+ */
+export async function getInstitutionCatalogTree(institutionId: string): Promise<SimulationCatalog[]> {
+  const res = await api.get<SimulationCatalog[]>(`/institutions/${institutionId}/simulation-catalogs/tree`);
+  return res.data ?? [];
+}
+
 /** Returns the subtree rooted at a specific catalog node. */
 export async function getCatalogSubtree(id: string): Promise<SimulationCatalog[]> {
   const res = await api.get<SimulationCatalog[]>(`/simulation-catalogs/${id}/tree`);
@@ -242,11 +270,6 @@ export async function getCatalogSubtree(id: string): Promise<SimulationCatalog[]
 export async function getDemoCatalogTree(): Promise<SimulationCatalog[]> {
   const res = await api.get<SimulationCatalog[]>('/simulation-catalogs/demo-tree');
   return res.data ?? [];
-}
-
-/** Returns assigned catalog tree for a specific institution (super_admin uses query param). */
-export async function getInstitutionCatalogTree(institutionId: string): Promise<SimulationCatalog[]> {
-  return getCatalogTree({ institutionId });
 }
 
 // ── Catalog CRUD ──────────────────────────────────────────────────────────────
@@ -360,6 +383,8 @@ export interface CreateSimulationInCatalogData {
   maxAttempts?: number;
   version?: string;
   learningObjectives?: string[];
+  isFeatured?: boolean;
+  featuredOrder?: number | null;
 }
 
 /** Creates a new simulation and links it to the given catalog in one call. */
@@ -490,6 +515,8 @@ export interface WebGLUploadData {
   visibility?: Simulation['visibility'];
   status?: Simulation['status'];
   thumbnailUrl?: string;
+  isFeatured?: boolean;
+  featuredOrder?: number;
 }
 
 /**
@@ -517,10 +544,12 @@ export async function uploadWebGLSimulation(
     if (data.visibility) formData.append('visibility', data.visibility);
     if (data.status) formData.append('status', data.status);
     if (data.thumbnailUrl) formData.append('thumbnailUrl', data.thumbnailUrl);
+    if (data.isFeatured) formData.append('isFeatured', String(data.isFeatured));
+    if (data.featuredOrder !== undefined) formData.append('featuredOrder', String(data.featuredOrder));
 
     const xhr = new XMLHttpRequest();
 
-    const baseUrl = API_BASE_URL.replace(/\/+$/, '');
+    const baseUrl = UPLOAD_API_URL.replace(/\/+$/, '');
     const uploadUrl =
       `${baseUrl}/simulation-catalogs/${catalogId}/simulations/webgl-upload`;
 

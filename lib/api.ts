@@ -27,6 +27,16 @@ interface RequestOptions {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiSuccess<T>> {
+  // DEV ONLY — falls back to mock data when the backend is unavailable (lib/devMockApi.ts).
+  // The inline env check is compiled to `false` in production builds, so the mock module is never loaded.
+  if (process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEV_MOCK_AUTH === 'true') {
+    const { devMockRequest } = await import('./devMockApi');
+    return devMockRequest<T>(options.method ?? 'GET', path, options.params, options.body, () => sendRequest<T>(path, options));
+  }
+  return sendRequest<T>(path, options);
+}
+
+async function sendRequest<T>(path: string, options: RequestOptions): Promise<ApiSuccess<T>> {
   const { method = 'GET', body, params, headers = {} } = options;
 
   let url = `${API_BASE_URL}${path}`;
@@ -67,10 +77,31 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
   return res.json() as Promise<ApiSuccess<T>>;
 }
 
+/** POST a multipart/form-data body (file uploads) — no Content-Type header,
+ *  so the browser sets its own boundary. */
+async function postForm<T>(path: string, form: FormData): Promise<ApiSuccess<T>> {
+  const headers: Record<string, string> = {};
+  if (_accessToken) headers['Authorization'] = `Bearer ${_accessToken}`;
+
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'POST',
+    headers,
+    body: form,
+    credentials: 'include',
+  });
+
+  if (!res.ok) {
+    const err: ApiError = await res.json().catch(() => ({ type: 'about:blank', title: res.statusText, status: res.status }));
+    throw err;
+  }
+  return res.json() as Promise<ApiSuccess<T>>;
+}
+
 export const api = {
-  get:    <T>(path: string, params?: Record<string, unknown>) => request<T>(path, { params }),
-  post:   <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
-  patch:  <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
-  put:    <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
-  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  get:      <T>(path: string, params?: Record<string, unknown>) => request<T>(path, { params }),
+  post:     <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
+  postForm,
+  patch:    <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
+  put:      <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
+  delete:   <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 };

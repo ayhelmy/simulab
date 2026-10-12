@@ -72,7 +72,7 @@ export default function ProfilePage() {
       <Card
       //  bodyStyle={{ padding: 0 }} 
        style={{ marginBottom: 20, overflow: 'hidden' }}>
-        <div style={{ height: 80, background: 'linear-gradient(135deg, #F59324 0%, #E07B15 100%)' }} />
+        <div style={{ height: 80, background: 'linear-gradient(135deg, #FEF3E2 0%, #FFF8F1 100%)', borderBottom: '1px solid #FDE8C6' }} />
         <div style={{ padding: '0 24px 24px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: -36 }}>
             <Avatar

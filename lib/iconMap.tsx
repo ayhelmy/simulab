@@ -16,6 +16,7 @@ import {
   CloudOutlined, DatabaseOutlined, LineChartOutlined, LockOutlined,
   MailOutlined, MessageOutlined, MobileOutlined, PieChartOutlined,
   UserOutlined, BankOutlined, AppstoreOutlined,
+  CompassOutlined, CloudServerOutlined, PlayCircleOutlined,
 } from '@ant-design/icons';
 
 const ICON_MAP: Record<string, React.ComponentType<{ style?: React.CSSProperties }>> = {
@@ -30,6 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ style?: React.CSSProperties
   CloudOutlined, DatabaseOutlined, LineChartOutlined, LockOutlined,
   MailOutlined, MessageOutlined, MobileOutlined, PieChartOutlined,
   UserOutlined, BankOutlined, AppstoreOutlined,
+  CompassOutlined, CloudServerOutlined, PlayCircleOutlined,
 };
 
 export function resolveIcon(

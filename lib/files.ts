@@ -1,4 +1,4 @@
-import { API_BASE_URL } from './constants';
+import { UPLOAD_API_URL } from './constants';
 import { getAccessToken } from './api';
 
 export interface UploadedFile {
@@ -16,7 +16,7 @@ export async function uploadLessonFile(file: File): Promise<UploadedFile> {
   const headers: Record<string, string> = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${API_BASE_URL}/files/upload-file`, {
+  const res = await fetch(`${UPLOAD_API_URL}/files/upload-file`, {
     method:      'POST',
     headers,
     credentials: 'include',

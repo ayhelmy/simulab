@@ -1,33 +1,24 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-  Input, Select, Button, Tag, Pagination,
-  Alert, Empty, Drawer, Badge, Spin,
-  Layout,
-} from 'antd';
-import {
-  FilterOutlined, CloseOutlined, ReloadOutlined,
-  AppstoreOutlined, SearchOutlined,
-} from '@ant-design/icons';
-import type { SimulationCatalog, SimulationSearchFilters } from '@/types';
+import { Select, Pagination, Alert, Empty, Drawer, Button, Spin, Layout } from 'antd';
+import { FilterOutlined } from '@ant-design/icons';
+import type { SimulationCatalog, SimulationSearchFilters, CatalogSimulation } from '@/types';
 import { getDemoCatalogTree, listDemoSimulationsPaginated } from '@/lib/simulations';
 import { useAuth } from '@/context/AuthContext';
+import { colors } from '@/components/home/homeTheme';
+import Footer from '@/components/home/Footer';
+import PublicHeader from './PublicHeader';
+import CatalogHero from './CatalogHero';
+import CatalogFilterBar from './CatalogFilterBar';
+import CatalogSidebarFilters from './CatalogSidebarFilters';
 import SimulationCard from './SimulationCard';
 import { SimulationSkeletonList } from './SimulationSkeleton';
-import CatalogTreeFilter from './CatalogTreeFilter';
-import type { Simulation } from '@/types';
-import { Typography } from 'antd';
-import PublicHeader from './PublicHeader';
-const { Search } = Input;
-const { Text } = Typography;
-const DIFFICULTY_OPTIONS = [
-  { value: '',             label: 'All Levels'    },
-  { value: 'beginner',     label: 'Beginner'      },
-  { value: 'intermediate', label: 'Intermediate'  },
-  { value: 'advanced',     label: 'Advanced'      },
-];
+import AnnouncementBar, { ANNOUNCEMENT_BAR_HEIGHT } from '../home/AnnouncementBar';
+
+
+const HEADER_HEIGHT = 64;
 
 const PAGE_SIZE = 12;
 
@@ -44,6 +35,16 @@ function readFiltersFromParams(params: URLSearchParams): SimulationSearchFilters
   };
 }
 
+/** Flattens the catalog tree (root + all descendants) so any node's id — however deep — resolves to a label. */
+function flattenCatalogTree(nodes: SimulationCatalog[]): { value: string; label: string }[] {
+  const out: { value: string; label: string }[] = [];
+  for (const n of nodes) {
+    out.push({ value: n.id, label: n.name });
+    if (n.children?.length) out.push(...flattenCatalogTree(n.children));
+  }
+  return out;
+}
+
 function buildURL(filters: SimulationSearchFilters): string {
   const p = new URLSearchParams();
   if (filters.search)          p.set('search',     filters.search);
@@ -56,6 +57,7 @@ function buildURL(filters: SimulationSearchFilters): string {
 }
 
 // ── main component ────────────────────────────────────────────────────────────
+const { Content } = Layout;
 
 export default function CatalogClientPage() {
   const router       = useRouter();
@@ -63,7 +65,6 @@ export default function CatalogClientPage() {
   const { user, loading: authLoading } = useAuth();
   const isAuthenticated = !authLoading && !!user;
 
-  // -- Filter state — local state is source of truth --------------------------
   const [filters, setFilters] = useState<SimulationSearchFilters>(() =>
     readFiltersFromParams(searchParams),
   );
@@ -76,50 +77,21 @@ export default function CatalogClientPage() {
   }, [searchParams]);
 
   // -- Data state ------------------------------------------------------------
-  const [simulations, setSimulations] = useState<Simulation[]>([]);
+  const [simulations, setSimulations] = useState<CatalogSimulation[]>([]);
   const [total,       setTotal]       = useState(0);
   const [totalPages,  setTotalPages]  = useState(1);
   const [simsLoading, setSimsLoading] = useState(true);
   const [isFirstLoad, setIsFirstLoad] = useState(true);
   const [simsError,   setSimsError]   = useState<string | null>(null);
-  const [resultsKey,  setResultsKey]  = useState(0);   // increments to re-trigger card animation
+  const [resultsKey,  setResultsKey]  = useState(0);
 
-  const [catalogTree,  setCatalogTree]  = useState<SimulationCatalog[]>([]);
-  const [treeLoading,  setTreeLoading]  = useState(true);
+  const [catalogTree, setCatalogTree] = useState<SimulationCatalog[]>([]);
+  const [treeLoading, setTreeLoading] = useState(true);
   const [filtersDrawerOpen, setFiltersDrawerOpen] = useState(false);
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const filterBarRef  = useRef<HTMLElement>(null);
-  const mainRef       = useRef<HTMLDivElement>(null);
 
-  // -- Sync filter-bar height into CSS variable so content offset stays correct --
-  useEffect(() => {
-    const el = filterBarRef.current;
-    if (!el) return;
-    const update = () =>
-      document.documentElement.style.setProperty('--filter-h', `${el.offsetHeight}px`);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // -- Sync sidebar left position into CSS variable (fixed sidebar must match centered container) --
-  useEffect(() => {
-    const update = () => {
-      const el = mainRef.current;
-      if (!el) return;
-      const left = el.getBoundingClientRect().left + 24; // 24px = container padding
-      document.documentElement.style.setProperty('--sidebar-left', `${left}px`);
-    };
-    update();
-    const ro = new ResizeObserver(update);
-    if (mainRef.current) ro.observe(mainRef.current);
-    window.addEventListener('resize', update);
-    return () => { ro.disconnect(); window.removeEventListener('resize', update); };
-  }, []);
-
-  // -- Catalog tree ----------------------------------------------------------
+  // -- Catalog tree ------------------------------------------------------------
   useEffect(() => {
     getDemoCatalogTree()
       .then(setCatalogTree)
@@ -127,7 +99,12 @@ export default function CatalogClientPage() {
       .finally(() => setTreeLoading(false));
   }, []);
 
-  // -- Simulations -----------------------------------------------------------
+  const disciplineOptions = useMemo(
+    () => flattenCatalogTree(catalogTree),
+    [catalogTree],
+  );
+
+  // -- Simulations -------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     setSimsLoading(true);
@@ -140,7 +117,7 @@ export default function CatalogClientPage() {
         setTotal(res.meta.total);
         setTotalPages(res.meta.totalPages);
         setIsFirstLoad(false);
-        setResultsKey((k) => k + 1);          // triggers stagger re-animation
+        setResultsKey((k) => k + 1);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -153,7 +130,7 @@ export default function CatalogClientPage() {
     return () => { cancelled = true; };
   }, [filters]);
 
-  // -- Filter helpers --------------------------------------------------------
+  // -- Filter helpers ------------------------------------------------------------
 
   function applyFilters(next: SimulationSearchFilters, replace = true) {
     ownNavRef.current = true;
@@ -182,6 +159,10 @@ export default function CatalogClientPage() {
     resetPage({ difficulty: (value as SimulationSearchFilters['difficulty']) || undefined });
   }
 
+  function handleDisciplineChange(catalogId: string) {
+    resetPage({ catalogId: catalogId || undefined, includeChildren: !!catalogId });
+  }
+
   function handleCatalogSelect(keys: string[], includeChildren: boolean) {
     const catalogId = keys[0] ?? undefined;
     resetPage({ catalogId, includeChildren: catalogId ? includeChildren : false });
@@ -198,64 +179,24 @@ export default function CatalogClientPage() {
     setFilters({ page: 1, limit: PAGE_SIZE });
   }
 
-  // -- Active filter tags ----------------------------------------------------
+  const hasActiveFilters = !!(filters.search || filters.difficulty || filters.catalogId);
 
-  const activeFilterTags: { label: string; onRemove: () => void }[] = [];
-  if (filters.search) {
-    activeFilterTags.push({ label: `"${filters.search}"`, onRemove: () => resetPage({ search: undefined }) });
-  }
-  if (filters.difficulty) {
-    activeFilterTags.push({ label: filters.difficulty, onRemove: () => resetPage({ difficulty: undefined }) });
-  }
-  if (filters.catalogId) {
-    const found = findCatalogName(catalogTree, filters.catalogId);
-    activeFilterTags.push({
-      label:    found ?? 'Catalog',
-      onRemove: () => resetPage({ catalogId: undefined, includeChildren: false }),
-    });
-  }
+  // -- Sidebar ------------------------------------------------------------------
 
   const selectedCatalogKeys = filters.catalogId ? [filters.catalogId] : [];
 
-  // -- Sidebar panel ---------------------------------------------------------
-
-  const filterSidebar = (
-    <div className="catalog-sidebar-inner">
-      <div className="catalog-sidebar-section">
-        <p className="catalog-sidebar-title">
-          <AppstoreOutlined style={{ marginRight: 6 }} />
-          Simulation Catalog
-        </p>
-        <CatalogTreeFilter
-          catalogs={catalogTree}
-          loading={treeLoading}
-          selectedKeys={selectedCatalogKeys}
-          onSelect={(keys, sub) => { handleCatalogSelect(keys, sub); setFiltersDrawerOpen(false); }}
-        />
-      </div>
-
-      <div className="catalog-sidebar-divider" />
-
-      <div className="catalog-sidebar-section">
-        <p className="catalog-sidebar-title">Difficulty</p>
-        <div className="catalog-diff-list">
-          {DIFFICULTY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              className={`catalog-filter-btn${
-                (!filters.difficulty && !opt.value) || filters.difficulty === opt.value ? ' active' : ''
-              }`}
-              onClick={() => { handleDifficultyChange(opt.value); setFiltersDrawerOpen(false); }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+  const sidebar = (
+    <CatalogSidebarFilters
+      catalogTree={catalogTree}
+      catalogLoading={treeLoading}
+      selectedCatalogKeys={selectedCatalogKeys}
+      onCatalogSelect={handleCatalogSelect}
+      level={filters.difficulty ?? ''}
+      onLevelChange={handleDifficultyChange}
+    />
   );
 
-  // -- Results area ----------------------------------------------------------
+  // -- Results --------------------------------------------------------------------
 
   function renderResults() {
     if (simsError) {
@@ -265,9 +206,7 @@ export default function CatalogClientPage() {
           message="Failed to load simulations"
           description={simsError}
           showIcon
-          action={
-            <Button size="small" onClick={() => setFilters({ ...filters })}>Retry</Button>
-          }
+          action={<Button size="small" onClick={() => setFilters({ ...filters })}>Retry</Button>}
         />
       );
     }
@@ -302,21 +241,9 @@ export default function CatalogClientPage() {
             </div>
           )}
 
-          {/* key={resultsKey} remounts list → re-triggers CSS animation per card */}
-          <div
-            key={resultsKey}
-            className="sim-results-list"
-            role="list"
-            aria-label={`${total} simulations`}
-            aria-busy={simsLoading}
-          >
+          <div key={resultsKey} className="sim-results-grid" role="list" aria-label={`${total} simulations`} aria-busy={simsLoading}>
             {simulations.map((sim, i) => (
-              <div
-                key={sim.id}
-                role="listitem"
-                className="sim-card-anim"
-                style={{ animationDelay: `${i * 45}ms` }}
-              >
+              <div key={sim.id} role="listitem" className="sim-card-anim" style={{ animationDelay: `${i * 45}ms` }}>
                 <SimulationCard simulation={sim} isAuthenticated={isAuthenticated} />
               </div>
             ))}
@@ -339,133 +266,77 @@ export default function CatalogClientPage() {
     );
   }
 
-  // -- Render ----------------------------------------------------------------
+  // -- Render -----------------------------------------------------------------
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f9f9fa' }}>
-      <PublicHeader />
-      <div className="public-catalog-content">
+        <Layout style={{ minHeight: '100vh', background: '#fff' }}>
+      <AnnouncementBar />
+      <PublicHeader topOffset={ANNOUNCEMENT_BAR_HEIGHT} />
+      <Content style={{ paddingTop: HEADER_HEIGHT + ANNOUNCEMENT_BAR_HEIGHT }}>
+     <div style={{ background: colors.bg }}>
+   
+      {/* <div style={{ paddingTop: 64 }}> */}
+        <CatalogHero />
 
+        <div style={{ margin: '0 auto',         padding: '16px 100px 16px 100px',
+ }}>
+          <CatalogFilterBar
+            searchValue={filters.search ?? ''}
+            onSearchChange={handleSearchChange}
+            level={filters.difficulty ?? ''}
+            onLevelChange={handleDifficultyChange}
+            disciplineOptions={disciplineOptions}
+            disciplineValue={filters.catalogId ?? ''}
+            onDisciplineChange={handleDisciplineChange}
+            hasActiveFilters={hasActiveFilters}
+            onResetAll={handleResetAll}
+          />
+        </div>
 
-        {/* ── Main layout: sidebar placeholder + results ──────────────────── */}
-        <div className="catalog-main-layout" ref={mainRef}>
-        {/* ── Sticky search + filter bar ──────────────────────────────────── */}
-        <section ref={filterBarRef} className="catalog-filter-bar" aria-label="Search and filter">
-          <div className="catalog-filter-bar-inner">
-            <div className="catalog-filter-row">
-              {/* Search */}
-              <div className="catalog-search-wrap">
-                <Search
-                  placeholder="Search simulations by title, topic, or objective..."
-                  defaultValue={filters.search ?? ''}
-                  key={filters.search ?? ''}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  onSearch={handleSearchChange}
-                  allowClear
-                  prefix={<SearchOutlined className="catalog-search-icon" />}
-                  className="catalog-search-input"
-                  aria-label="Search simulations"
-                />
-              </div>
+        <div className="catalog-main-layout" style={{  margin: '0 auto',        padding: '16px 100px 16px 100px', display: 'flex', alignItems: 'flex-start', gap: 24 }}>
+          <aside className="catalog-sidebar-desktop" aria-label="Filter simulations" style={{ flexShrink: 0, width: 248 }}>
+            {sidebar}
+          </aside>
 
-              {/* Difficulty select */}
-              <div className="catalog-select-wrap">
-                <Select
-                  value={filters.difficulty ?? ''}
-                  onChange={handleDifficultyChange}
-                  options={DIFFICULTY_OPTIONS}
-                  style={{ width: '100%' }}
-                  aria-label="Filter by difficulty"
-                />
-              </div>
-
-              {/* Right-side controls */}
-              <div className="catalog-controls-wrap">
-                {/* <span className="catalog-result-count">
-                  {simsLoading && isFirstLoad
-                    ? '—'
-                    : `${total.toLocaleString()} result${total !== 1 ? 's' : ''}`}
-                </span> */}
-
+          <main className="catalog-results-column" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, flexWrap: 'wrap', gap: 12 }}>
+              <span style={{ fontSize: 14, color: colors.body }}>
+                Showing <strong style={{ color: colors.heading }}>{total}</strong> simulation{total !== 1 ? 's' : ''}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <Button
                   icon={<FilterOutlined />}
                   className="catalog-mobile-filter-btn"
                   onClick={() => setFiltersDrawerOpen(true)}
-                  aria-label="Open filters"
                 >
                   Filters
-                  {activeFilterTags.length > 0 && (
-                    <Badge count={activeFilterTags.length} size="small" style={{ marginLeft: 6 }} />
-                  )}
                 </Button>
-
-                {activeFilterTags.length > 0 && (
-                  <button className="catalog-reset-btn" onClick={handleResetAll}>
-                    <ReloadOutlined style={{ marginRight: 4 }} />
-                    Reset all
-                  </button>
-                )}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: colors.body }}>
+                  Sort:
+                  <Select value="relevant" style={{ width: 150 }} options={[{ value: 'relevant', label: 'Most Relevant' }]} />
+                </span>
               </div>
             </div>
 
-            {/* Active filter tags */}
-            {activeFilterTags.length > 0 && (
-              <div className="catalog-active-tags" role="list" aria-label="Active filters">
-                {activeFilterTags.map((t, i) => (
-                  <Tag
-                    key={t.label}
-                    closable
-                    onClose={t.onRemove}
-                    closeIcon={<CloseOutlined />}
-                    className="catalog-active-tag"
-                    role="listitem"
-                    style={{ animationDelay: `${i * 40}ms` }}
-                  >
-                    {t.label}
-                  </Tag>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-          {/* Placeholder reserves sidebar width in flex; sidebar itself is position:fixed */}
-          <div className="catalog-sidebar-placeholder">
-            <aside className="catalog-sidebar-desktop" aria-label="Filter simulations">
-              {filterSidebar}
-            </aside>
-          </div>
-
-          {/* Results */}
-          <main className="catalog-results-column">
             {renderResults()}
           </main>
         </div>
-      </div>
 
-      {/* Mobile filters drawer */}
+        <Footer />
+      {/* </div> */}
+
       <Drawer
         title="Filters"
         placement="left"
         open={filtersDrawerOpen}
         onClose={() => setFiltersDrawerOpen(false)}
-        styles={{ wrapper: { width: 280 }, body: { padding: '16px' } }}
+        styles={{ body: { padding: '16px' } }}
       >
-        {filterSidebar}
+        {sidebar}
       </Drawer>
+    </div>
+      </Content>
     </Layout>
+   
   );
-}
-
-// ── utility ───────────────────────────────────────────────────────────────────
-
-function findCatalogName(nodes: SimulationCatalog[], id: string): string | undefined {
-  for (const n of nodes) {
-    if (n.id === id) return n.name;
-    if (n.children?.length) {
-      const found = findCatalogName(n.children, id);
-      if (found) return found;
-    }
-  }
-  return undefined;
 }

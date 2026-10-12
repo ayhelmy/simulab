@@ -1,18 +1,46 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { changePassword } from '@/lib/users';
 import { getInstitutionSettings, updateInstitutionSettings, type InstitutionSettings } from '@/lib/institutions';
+import { getNotificationPreferences, updateNotificationPreferences } from '@/lib/notifications';
+import type { NotificationPreferenceCategory, NotificationPreferences } from '@/types';
 import {
-  Tabs, Form, Input, Button, Switch, Select, InputNumber, Card, Alert,
-  Typography, Space, Divider, Row, Col, Spin, App,
+  Tabs, Form, Input, Button, Switch, Select, InputNumber, Avatar,
+  Row, Col, Skeleton, App,
 } from 'antd';
-import { LockOutlined, BellOutlined, BankOutlined, DeleteOutlined } from '@ant-design/icons';
-import PageHeader from '@/components/common/PageHeader';
+import {
+  LockOutlined, BellOutlined, BankOutlined, DeleteOutlined, UserOutlined,
+  WarningOutlined, ExperimentOutlined, SafetyOutlined, BgColorsOutlined, TeamOutlined,
+} from '@ant-design/icons';
+import { Chip } from '@/components/student/studentUi';
+import {
+  ADMIN_PAGE_CLASS, adminStyles as a, AdminHeader, AdminCard, LoadErrorState,
+} from '@/components/admin/adminUi';
 
-const { Title, Text } = Typography;
+/** Card-shaped placeholders that mirror the real layout (§21.10). */
+function CardSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <AdminCard>
+      <Skeleton active title={{ width: 180 }} paragraph={{ rows }} />
+    </AdminCard>
+  );
+}
+
+function SettingRow({ label, hint, control }: { label: string; hint?: string; control: React.ReactNode }) {
+  return (
+    <div className={a.settingRow}>
+      <div style={{ minWidth: 0 }}>
+        <span className={a.settingLabel}>{label}</span>
+        {hint && <span className={a.settingHint}>{hint}</span>}
+      </div>
+      {control}
+    </div>
+  );
+}
 
 // -- Institution Settings Tab --------------------------------------------------
 
@@ -22,17 +50,31 @@ function InstitutionTab() {
   const [form] = Form.useForm<Partial<InstitutionSettings>>();
 
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving]   = useState(false);
   const [settingsId, setSettingsId] = useState<string | undefined>();
 
-  useEffect(() => {
+  function fetchSettings() {
     getInstitutionSettings()
       .then((s) => {
         setSettingsId(s.id);
         form.setFieldsValue(s);
       })
-      .catch(() => message.error('Failed to load institution settings.'))
+      .catch(() => {
+        setLoadFailed(true);
+        message.error('Failed to load institution settings.');
+      })
       .finally(() => setLoading(false));
+  }
+
+  function load() {
+    setLoading(true);
+    setLoadFailed(false);
+    fetchSettings();
+  }
+
+  useEffect(() => {
+    fetchSettings();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -50,7 +92,19 @@ function InstitutionTab() {
   }
 
   if (loading) {
-    return <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><Spin size="large" /></div>;
+    return <><CardSkeleton rows={4} /><CardSkeleton /><CardSkeleton rows={2} /></>;
+  }
+
+  if (loadFailed) {
+    return (
+      <AdminCard>
+        <LoadErrorState
+          title="Could not load institution settings"
+          text="Institution settings could not be loaded. Try again or check the system connection."
+          onRetry={load}
+        />
+      </AdminCard>
+    );
   }
 
   const tzOptions = [
@@ -61,31 +115,30 @@ function InstitutionTab() {
 
   return (
     <Form form={form} layout="vertical" onFinish={handleSave} requiredMark={false}>
-      {/* Branding */}
-      <Card title="Branding" size="small" style={{ marginBottom: 16 }}>
+      <AdminCard title="Branding & Locale" icon={<BgColorsOutlined />} helper="How the institution appears to its users">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="Institution Name" name="name">
               <Input />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Logo URL" name="logoUrl">
+          <Col xs={24} md={12}>
+            <Form.Item label="Logo URL" name="logoUrl" extra="A square image works best (at least 128 × 128 px).">
               <Input placeholder="https://…" />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="Brand Color" name="primaryColor">
-              <Input type="color" style={{ height: 38 }} />
+              <Input type="color" style={{ height: 38, maxWidth: 120 }} />
             </Form.Item>
           </Col>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="Timezone" name="timezone">
               <Select options={tzOptions} showSearch />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Default Language" name="locale">
+          <Col xs={24} md={12}>
+            <Form.Item label="Default Language" name="locale" style={{ marginBottom: 0 }}>
               <Select
                 options={[
                   { value: 'en', label: 'English' },
@@ -97,12 +150,11 @@ function InstitutionTab() {
             </Form.Item>
           </Col>
         </Row>
-      </Card>
+      </AdminCard>
 
-      {/* Enrollment Policy */}
-      <Card title="Enrollment Policy" size="small" style={{ marginBottom: 16 }}>
+      <AdminCard title="Enrollment Policy" icon={<TeamOutlined />} helper="Defaults for new courses">
         <Row gutter={16}>
-          <Col span={12}>
+          <Col xs={24} md={12}>
             <Form.Item label="Default Enrollment Type" name="enrollmentType">
               <Select
                 options={[
@@ -114,55 +166,58 @@ function InstitutionTab() {
               />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Default Enrollment Cap (0 = unlimited)" name="enrollmentCap">
+          <Col xs={24} md={12}>
+            <Form.Item label="Default Enrollment Cap" name="enrollmentCap" extra="0 means unlimited.">
               <InputNumber min={0} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
-        <Form.Item label="Require approval for enrollment requests" name="requireApproval" valuePropName="checked">
+        <Form.Item label="Require approval for enrollment requests" name="requireApproval" valuePropName="checked" style={{ marginBottom: 0 }}>
           <Switch />
         </Form.Item>
-      </Card>
+      </AdminCard>
 
-      {/* Notifications */}
-      <Card title="Notification Defaults" size="small" style={{ marginBottom: 16 }}>
-        <Form.Item label="Email notifications" name="notificationEmailEnabled" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-        <Form.Item label="Push notifications" name="notificationPushEnabled" valuePropName="checked">
-          <Switch />
-        </Form.Item>
-      </Card>
-
-      {/* Simulation */}
-      <Card title="Simulation Defaults" size="small" style={{ marginBottom: 16 }}>
+      <AdminCard title="Notification Defaults" icon={<BellOutlined />} helper="Channels enabled for the institution's users">
         <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item label="Default max attempts per simulation" name="maxSimAttempts">
+          <Col xs={12}>
+            <Form.Item label="Email notifications" name="notificationEmailEnabled" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Switch />
+            </Form.Item>
+          </Col>
+          <Col xs={12}>
+            <Form.Item label="Push notifications" name="notificationPushEnabled" valuePropName="checked" style={{ marginBottom: 0 }}>
+              <Switch />
+            </Form.Item>
+          </Col>
+        </Row>
+      </AdminCard>
+
+      <AdminCard title="Simulation Defaults" icon={<ExperimentOutlined />} helper="Applied when a simulation does not set its own values">
+        <Row gutter={16}>
+          <Col xs={24} md={12}>
+            <Form.Item label="Default max attempts per simulation" name="maxSimAttempts" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={99} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item label="Default passing score (%)" name="passScore">
+          <Col xs={24} md={12}>
+            <Form.Item label="Default passing score (%)" name="passScore" style={{ marginBottom: 0 }}>
               <InputNumber min={0} max={100} style={{ width: '100%' }} />
             </Form.Item>
           </Col>
         </Row>
-      </Card>
+      </AdminCard>
 
-      {/* Auth */}
-      <Card title="Authentication" size="small" style={{ marginBottom: 16 }}>
-        <Form.Item label="Session duration (days)" name="sessionDurationDays">
-          <InputNumber min={1} max={365} style={{ maxWidth: 200 }} />
+      <AdminCard title="Authentication" icon={<SafetyOutlined />}>
+        <Form.Item label="Session duration (days)" name="sessionDurationDays" extra="How long users stay signed in before they must sign in again.">
+          <InputNumber min={1} max={365} style={{ maxWidth: 200, width: '100%' }} />
         </Form.Item>
-        <Form.Item label="Require email verification for new accounts" name="requireEmailVerification" valuePropName="checked">
+        <Form.Item label="Require email verification for new accounts" name="requireEmailVerification" valuePropName="checked" style={{ marginBottom: 0 }}>
           <Switch />
         </Form.Item>
-      </Card>
+      </AdminCard>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Button type="link" onClick={() => router.push(`/institutions/${settingsId}`)}>
+      <div className={a.formFooter}>
+        <Button type="link" style={{ paddingInline: 0 }} onClick={() => router.push(`/institutions/${settingsId}`)}>
           Advanced institution management →
         </Button>
         <Button type="primary" htmlType="submit" loading={saving}>Save Institution Settings</Button>
@@ -180,14 +235,52 @@ function AccountTab() {
 
   const [pwSaving, setPwSaving] = useState(false);
 
-  const [notifs, setNotifs] = useState({
-    courseUpdates:  true,
-    gradePosted:    true,
-    newMessages:    true,
-    systemAnnounce: true,
-    weeklyDigest:   false,
-  });
-  const setNotif = (k: keyof typeof notifs) => (v: boolean) => setNotifs((n) => ({ ...n, [k]: v }));
+  const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [prefsLoading, setPrefsLoading] = useState(true);
+  const [prefsSaving, setPrefsSaving] = useState(false);
+
+  function fetchPrefs() {
+    getNotificationPreferences()
+      .then(setPrefs)
+      .catch(() => message.error('Failed to load notification preferences.'))
+      .finally(() => setPrefsLoading(false));
+  }
+
+  function retryPrefs() {
+    setPrefsLoading(true);
+    fetchPrefs();
+  }
+
+  useEffect(() => {
+    fetchPrefs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function savePrefs(partial: Partial<NotificationPreferences>) {
+    if (!prefs) return;
+    const next = { ...prefs, ...partial };
+    setPrefs(next);
+    setPrefsSaving(true);
+    try {
+      const saved = await updateNotificationPreferences({
+        emailEnabled: next.emailEnabled,
+        inAppEnabled: next.inAppEnabled,
+        pushEnabled: next.pushEnabled,
+        digestFrequency: next.digestFrequency,
+        preferences: next.preferences,
+      });
+      setPrefs(saved);
+    } catch {
+      message.error('Failed to save notification preferences.');
+    } finally {
+      setPrefsSaving(false);
+    }
+  }
+
+  function setCategory(key: NotificationPreferenceCategory, value: boolean) {
+    if (!prefs) return;
+    savePrefs({ preferences: { ...prefs.preferences, [key]: value } });
+  }
 
   async function handleChangePassword(values: { current: string; next: string }) {
     if (!user) return;
@@ -204,16 +297,38 @@ function AccountTab() {
     }
   }
 
+  if (!user) return null;
+
   return (
-    <Space orientation="vertical" style={{ width: '100%' }}>
-      {/* Change Password */}
-      <Card title="Change Password" size="small">
+    <>
+      {/* Account settings */}
+      <AdminCard
+        title="Account Settings"
+        icon={<UserOutlined />}
+        extra={<Link href="/profile"><Button size="small">Edit Profile</Button></Link>}
+      >
+        <div className={a.cell} style={{ alignItems: 'flex-start' }}>
+          <Avatar size={48} src={user.avatarUrl} style={{ background: '#F59324', fontWeight: 700, flexShrink: 0 }}>
+            {!user.avatarUrl && `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()}
+          </Avatar>
+          <div style={{ minWidth: 0 }}>
+            <span className={a.cellTitle}>{user.firstName} {user.lastName}</span>
+            <span className={a.cellSub} style={{ overflowWrap: 'anywhere' }}>{user.email}</span>
+            <span style={{ display: 'inline-flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+              {user.roles.map((r) => <Chip key={r.id} tone="info">{r.label}</Chip>)}
+            </span>
+          </div>
+        </div>
+      </AdminCard>
+
+      {/* Password */}
+      <AdminCard title="Password" icon={<LockOutlined />} helper="Change the password you use to sign in. Use at least 8 characters.">
         <Form
           form={pwForm}
           layout="vertical"
           requiredMark={false}
           onFinish={handleChangePassword}
-          style={{ maxWidth: 480 }}
+          style={{ maxWidth: 440 }}
         >
           <Form.Item
             label="Current Password"
@@ -251,58 +366,91 @@ function AccountTab() {
           </Form.Item>
           <Button type="primary" htmlType="submit" loading={pwSaving}>Update Password</Button>
         </Form>
-      </Card>
+      </AdminCard>
 
       {/* Notification Preferences */}
-      <Card title="Notification Preferences" size="small">
-        {(
-          [
-            ['courseUpdates',  'Course updates',        'New content, announcements, schedule changes'],
-            ['gradePosted',    'Grade posted',           'When an instructor posts or updates a grade'],
-            ['newMessages',    'New messages',           'When you receive a new direct message'],
-            ['systemAnnounce', 'System announcements',  'Maintenance windows and platform updates'],
-            ['weeklyDigest',   'Weekly digest',         'Summary of activity every Monday morning'],
-          ] as [keyof typeof notifs, string, string][]
-        ).map(([key, label, hint]) => (
-          <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F3F4F6' }}>
-            <div>
-              <Text style={{ fontSize: 14, fontWeight: 500 }}>{label}</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>{hint}</Text>
-            </div>
-            <Switch checked={notifs[key]} onChange={setNotif(key)} />
-          </div>
-        ))}
-        <Text type="secondary" style={{ display: 'block', marginTop: 12, fontSize: 12 }}>
-          Notification delivery is not yet wired — preferences will be persisted in a future update.
-        </Text>
-      </Card>
+      <AdminCard title="Notification Preferences" icon={<BellOutlined />} helper="Changes save automatically">
+        {prefsLoading ? (
+          <Skeleton active title={false} paragraph={{ rows: 6 }} />
+        ) : !prefs ? (
+          <LoadErrorState
+            compact
+            title="Could not load notification preferences"
+            text="Your notification preferences could not be loaded. Your current settings are unchanged."
+            onRetry={retryPrefs}
+          />
+        ) : (
+          <>
+            <span className={a.settingGroupLabel} style={{ marginTop: 0 }}>Delivery</span>
+            <SettingRow
+              label="In-app notifications"
+              hint="Show notifications in the bell and notifications page"
+              control={<Switch checked={prefs.inAppEnabled} loading={prefsSaving} onChange={(v) => savePrefs({ inAppEnabled: v })} />}
+            />
+            <SettingRow
+              label="Email notifications"
+              hint="Receive high-priority updates by email"
+              control={<Switch checked={prefs.emailEnabled} loading={prefsSaving} onChange={(v) => savePrefs({ emailEnabled: v })} />}
+            />
+            <SettingRow
+              label="Digest frequency"
+              hint="How often to bundle non-urgent updates"
+              control={
+                <Select
+                  value={prefs.digestFrequency}
+                  style={{ width: 140 }}
+                  aria-label="Digest frequency"
+                  onChange={(v) => savePrefs({ digestFrequency: v })}
+                  options={[
+                    { value: 'instant', label: 'Instant' },
+                    { value: 'daily',   label: 'Daily' },
+                    { value: 'weekly',  label: 'Weekly' },
+                    { value: 'off',     label: 'Off' },
+                  ]}
+                />
+              }
+            />
 
-      {/* Danger zone */}
-      <Card title="Account" size="small">
-        <Alert
-          type="error"
-          title={
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <Text strong>Delete account</Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>Permanently removes your account and all associated data</Text>
-              </div>
-              <Button
-                danger
-                size="small"
-                icon={<DeleteOutlined />}
-                onClick={() => message.warning('Account deletion must be requested through your institution admin.')}
-              >
-                Delete Account
-              </Button>
-            </div>
+            <span className={a.settingGroupLabel}>Categories</span>
+            {(
+              [
+                ['system_alerts',         'System alerts',         'Platform and maintenance notices'],
+                ['messages',              'Messages',              'New direct and course messages'],
+                ['course_announcements',  'Course announcements',  'Instructor announcements in your courses'],
+                ['enrollment_updates',    'Enrollment updates',    'Enrollment confirmed, approved, or rejected'],
+                ['quiz_updates',          'Quiz updates',          'New quizzes and manual-grading requests'],
+                ['grade_updates',         'Grade updates',         'When a grade is posted or overridden'],
+                ['simulation_updates',    'Simulation updates',    'When a simulation activity is completed'],
+              ] as [NotificationPreferenceCategory, string, string][]
+            ).map(([key, label, hint]) => (
+              <SettingRow
+                key={key}
+                label={label}
+                hint={hint}
+                control={<Switch checked={prefs.preferences[key]} loading={prefsSaving} onChange={(v) => setCategory(key, v)} />}
+              />
+            ))}
+          </>
+        )}
+      </AdminCard>
+
+      {/* Danger zone — visually separated */}
+      <AdminCard title="Danger Zone" icon={<WarningOutlined />} className={a.danger} style={{ marginTop: 32 }}>
+        <SettingRow
+          label="Delete account"
+          hint="Permanently removes your account and all associated data. This cannot be undone."
+          control={
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => message.warning('Account deletion must be requested through your institution admin.')}
+            >
+              Delete Account
+            </Button>
           }
-          showIcon={false}
         />
-      </Card>
-    </Space>
+      </AdminCard>
+    </>
   );
 }
 
@@ -317,7 +465,7 @@ export default function SettingsPage() {
   const tabItems = [
     {
       key: 'account',
-      label: <span><LockOutlined /> Account</span>,
+      label: <span><UserOutlined /> Account</span>,
       children: <AccountTab />,
     },
     ...(canManageInstitution ? [{
@@ -328,13 +476,13 @@ export default function SettingsPage() {
   ];
 
   return (
-    <div style={{ maxWidth: 780, margin: '0 auto' }}>
-      <PageHeader
+    <div className={ADMIN_PAGE_CLASS} style={{ maxWidth: 860, margin: '0 auto' }}>
+      <AdminHeader
+        eyebrow={null}
         title="Settings"
         subtitle={canManageInstitution
-          ? 'Manage your account and institution settings'
-          : 'Manage your account security and preferences'
-        }
+          ? 'Manage your account, password, notifications, and institution settings.'
+          : 'Manage your account security and preferences.'}
       />
       <Tabs items={tabItems} />
     </div>

@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import { useAuth } from '@/context/AuthContext';
 import {
-  Tree, Tag, Button, Spin, Alert, Typography, Modal, Form, Input,
-  Select, Popconfirm, App, Tabs, Table, Avatar, TreeSelect,
+  Tree, Button, Alert, Typography, Modal, Form, Input,
+  Select, Popconfirm, App, Tabs, Table, Avatar, TreeSelect, Skeleton,
   Space, Drawer, Row, Col, type TableColumnsType, TreeDataNode,
 } from 'antd';
 import {
@@ -15,10 +15,12 @@ import {
   ArrowRightOutlined, CarryOutOutlined, UploadOutlined, CheckCircleOutlined,
   InboxOutlined,
   CaretDownOutlined,
-  CaretLeftOutlined,
 } from '@ant-design/icons';
-import PageHeader from '@/components/common/PageHeader';
-import StatusTag from '@/components/common/StatusTag';
+import { Chip, type ChipTone } from '@/components/student/studentUi';
+import {
+  ADMIN_PAGE_CLASS, adminStyles as a, AdminHeader, AdminCard, StatusChip, StatTile,
+  StateBlock, LoadErrorState, statusLabel,
+} from '@/components/admin/adminUi';
 import {
   getCatalogTree, getAssignedCatalogTree, getCatalog, createCatalog, updateCatalog,
   moveCatalog, deleteCatalog, removeSimulationFromCatalog, createSimulationInCatalog,
@@ -32,14 +34,7 @@ import {
 import { listInstitutions } from '@/lib/institutions';
 import type { SimulationCatalog, Simulation } from '@/types';
 
-const { Text, Title } = Typography;
-
-const DIFF_COLOR: Record<string, string> = {
-  beginner: 'green', intermediate: 'blue', advanced: 'red',
-};
-const VIS_COLOR: Record<string, string> = {
-  global: 'blue', institution: 'purple', demo_public: 'orange',
-};
+const { Text } = Typography;
 
 // -- Tree data conversion ------------------------------------------------------
 
@@ -51,13 +46,25 @@ const VIS_COLOR: Record<string, string> = {
 //   icon?: React.ReactNode;
 // }
 
+const DIFF_TONE: Record<string, ChipTone> = {
+  beginner: 'success', intermediate: 'info', advanced: 'error',
+};
+
+/** Tree row: catalog name + simulation count (when the API sends it). */
 function toCatalogNodes(nodes: SimulationCatalog[]): TreeDataNode[] {
   return nodes.map((n) => ({
     key: n.id,
-    title: n.name,
+    title: (
+      <span className={a.treeNode} title={n.name}>
+        <span className={a.treeNodeName}>{n.name}</span>
+        {n.itemCount != null && (
+          <span className={a.treeNodeCount} aria-label={`${n.itemCount} simulations`}>{n.itemCount}</span>
+        )}
+        {n.status && n.status !== 'active' && <StatusChip status={n.status} />}
+      </span>
+    ),
     isLeaf: !n.children?.length,
     children: n.children?.length ? toCatalogNodes(n.children) : undefined,
-    icon: <CarryOutOutlined />,
   }));
 }
 
@@ -714,27 +721,41 @@ function AssignInstitutionModal({
 
 // -- Catalog Detail Panel ------------------------------------------------------
 
+const VIS_LABEL: Record<string, string> = {
+  global: 'Global', institution: 'Institution', demo_public: 'Demo Public', demo_and_institution: 'Demo + Institution',
+};
+
 function CatalogDetailPanel({
   catalog,
   institutions,
   canManage,
   onEditSuccess,
   onReloadDetail,
+  onAddSubCatalog,
+  onMove,
+  onDelete,
+  deleting,
 }: {
   catalog: SimulationCatalogDetail;
   institutions: AssignedInstitution[];
   canManage: boolean;
   onEditSuccess: (c: SimulationCatalog) => void;
   onReloadDetail: () => void;
+  onAddSubCatalog: () => void;
+  onMove: () => void;
+  onDelete: () => void;
+  deleting: boolean;
 }) {
   const router = useRouter();
   const { message } = App.useApp();
+  const [tab, setTab] = useState('simulations');
   const [showEdit, setShowEdit] = useState(false);
   // const [showCreateSim,   setShowCreateSim]   = useState(false);
   const [showWebGLUpload, setShowWebGLUpload] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
 
   async function handleRemoveSim(simId: string) {
     setRemovingId(simId);
@@ -764,32 +785,58 @@ function CatalogDetailPanel({
     }
   }
 
+  // Same update the Edit modal sends, with only the status changed.
+  async function handleArchive() {
+    setArchiving(true);
+    try {
+      const updated = await updateCatalog(catalog.id, { status: 'archived' });
+      message.success('Catalog archived');
+      onEditSuccess(updated);
+    } catch (err: unknown) {
+      const e = err as { title?: string; detail?: string };
+      message.error(e.title ?? e.detail ?? 'Failed to archive catalog');
+    } finally {
+      setArchiving(false);
+    }
+  }
+
   const assignedInstIds = new Set(institutions.map((i) => i.id));
+  const directCount = institutions.filter((i) => i.isDirect).length;
 
   const itemCols: TableColumnsType<CatalogItem> = [
     {
       title: 'Simulation',
+      key: 'title',
       render: (_, item) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Avatar size={32} shape="square" src={item.thumbnailUrl ?? undefined} icon={!item.thumbnailUrl && <ExperimentOutlined />} style={{ background: '#F59324' }} />
-          <div>
-            <Text strong style={{ fontSize: 13 }}>{item.title}</Text>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
-              {item.estimatedMinutes ? `${item.estimatedMinutes}m · ` : ''}{item.type.toUpperCase()}
-            </Text>
+        <div className={a.cell}>
+          <Avatar size={32} shape="square" src={item.thumbnailUrl ?? undefined} icon={!item.thumbnailUrl && <ExperimentOutlined />} style={{ background: '#D9E8F0', color: '#2F5A70', flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <a className={a.cellTitle} style={{ fontSize: 13 }} href={`/simulations/${item.simulationId}`} onClick={(e) => { e.preventDefault(); router.push(`/simulations/${item.simulationId}`); }}>
+              {item.title}
+            </a>
+            <span className={a.cellSub}>
+              {item.type === 'webgl' ? 'WebGL' : item.type.toUpperCase()}{item.estimatedMinutes ? ` · ${item.estimatedMinutes} min` : ''}
+            </span>
           </div>
         </div>
       ),
     },
-    { title: 'Difficulty', dataIndex: 'difficulty', width: 110, render: (d: string) => <Tag color={DIFF_COLOR[d]}>{d}</Tag> },
-    { title: 'Status', dataIndex: 'status', width: 100, render: (s: string) => <StatusTag status={s} /> },
+    { title: 'Difficulty', dataIndex: 'difficulty', width: 120, render: (d: string) => <Chip tone={DIFF_TONE[d] ?? 'neutral'}>{statusLabel(d)}</Chip> },
+    { title: 'Status', dataIndex: 'status', width: 110, render: (s: string) => <StatusChip status={s} /> },
     ...(canManage ? [{
-      title: '',
+      title: 'Actions',
       key: 'remove',
-      width: 50,
+      width: 100,
+      align: 'right' as const,
       render: (_: unknown, item: CatalogItem) => (
-        <Popconfirm title="Remove from catalog?" onConfirm={() => handleRemoveSim(item.simulationId)} okText="Remove" okButtonProps={{ danger: true }}>
-          <Button size="small" danger icon={<DeleteOutlined />} loading={removingId === item.simulationId} />
+        <Popconfirm
+          title={`Remove "${item.title}" from this catalog?`}
+          description="Institutions assigned to this catalog lose access to it."
+          onConfirm={() => handleRemoveSim(item.simulationId)}
+          okText="Remove"
+          okButtonProps={{ danger: true }}
+        >
+          <Button size="small" danger loading={removingId === item.simulationId}>Remove</Button>
         </Popconfirm>
       ),
     }] : []),
@@ -798,44 +845,52 @@ function CatalogDetailPanel({
   const instCols: TableColumnsType<AssignedInstitution> = [
     {
       title: 'Institution',
+      key: 'name',
       render: (_, inst) => (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className={a.cell}>
           <Avatar size={28} src={inst.logoUrl ?? undefined} style={{ background: '#F59324', flexShrink: 0 }}>
             {!inst.logoUrl && inst.name[0]}
           </Avatar>
-          <div>
-            <Text strong style={{ fontSize: 13 }}>{inst.name}</Text>
-            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>{inst.domain ?? inst.slug}</Text>
-            {!inst.isDirect && inst.assignedViaCatalog && (
-              <Text type="secondary" style={{ fontSize: 10, display: 'block', fontStyle: 'italic' }}>
-                via "{inst.assignedViaCatalog}"
-              </Text>
-            )}
+          <div style={{ minWidth: 0 }}>
+            <span className={a.cellTitle} style={{ fontSize: 13 }}>{inst.name}</span>
+            <span className={a.cellSub}>
+              {inst.domain ?? inst.slug}
+              {!inst.isDirect && inst.assignedViaCatalog && <> · via “{inst.assignedViaCatalog}”</>}
+            </span>
           </div>
         </div>
       ),
     },
     {
       title: 'Assignment',
-      width: 100,
+      key: 'assignment',
+      width: 120,
       render: (_: unknown, inst: AssignedInstitution) => (
-        inst.isDirect
-          ? <Tag color="blue">Direct</Tag>
-          : <Tag color="default">Inherited</Tag>
+        inst.isDirect ? <Chip tone="info">Direct</Chip> : <Chip tone="neutral">Inherited</Chip>
       ),
     },
-    { title: 'Subtree', dataIndex: 'includeSubtree', width: 80, render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? 'Yes' : 'No'}</Tag> },
-    { title: 'Status', dataIndex: 'status', width: 90, render: (s: string) => <StatusTag status={s} /> },
     {
-      title: '',
+      title: 'Sub-catalogs', dataIndex: 'includeSubtree', width: 120,
+      render: (v: boolean) => <Chip tone={v ? 'success' : 'neutral'}>{v ? 'Included' : 'Not included'}</Chip>,
+    },
+    { title: 'Status', dataIndex: 'status', width: 100, render: (s: string) => <StatusChip status={s} /> },
+    {
+      title: 'Actions',
       key: 'revoke',
-      width: 70,
+      width: 100,
+      align: 'right' as const,
       render: (_: unknown, inst: AssignedInstitution) => inst.isDirect ? (
-        <Popconfirm title="Revoke catalog?" onConfirm={() => handleRevokeInst(inst.id)} okText="Revoke" okButtonProps={{ danger: true }}>
+        <Popconfirm
+          title={`Revoke this catalog from ${inst.name}?`}
+          description="Its users lose access to the simulations in this catalog."
+          onConfirm={() => handleRevokeInst(inst.id)}
+          okText="Revoke"
+          okButtonProps={{ danger: true }}
+        >
           <Button size="small" danger loading={revokingId === inst.id}>Revoke</Button>
         </Popconfirm>
       ) : (
-        <Text type="secondary" style={{ fontSize: 11 }}>inherited</Text>
+        <span className={a.cellSub}>Inherited</span>
       ),
     },
   ];
@@ -845,85 +900,121 @@ function CatalogDetailPanel({
       key: 'simulations',
       label: `Simulations (${catalog.items.length})`,
       children: (
-        <div>
-          {canManage && (
-            <Space style={{ marginBottom: 12 }}>
-              <Button
-                type="primary"
-                size="small"
-                icon={<UploadOutlined />}
-                onClick={() => setShowWebGLUpload(true)}
-              >
-                Upload WebGL
-              </Button>
-              {/* <Button size="small" icon={<PlusOutlined />} onClick={() => setShowCreateSim(true)}>
-                Add (SCORM/LTI)
-              </Button> */}
-            </Space>
-          )}
-          {catalog.items.length === 0 ? (
-            <Alert type="info" showIcon title={canManage ? 'No simulations. Add some above.' : 'No simulations in this catalog.'} />
-          ) : (
-            <Table dataSource={catalog.items} columns={itemCols} rowKey="simulationId" size="small" pagination={{ pageSize: 15 }} />
-          )}
+        <div className={a.table}>
+          <Table
+            dataSource={catalog.items}
+            columns={itemCols}
+            rowKey="simulationId"
+            size="small"
+            scroll={{ x: 560 }}
+            pagination={catalog.items.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
+            locale={{
+              emptyText: (
+                <StateBlock
+                  compact
+                  icon={<ExperimentOutlined />}
+                  title="No simulations in this catalog"
+                  text={canManage
+                    ? 'Upload a WebGL simulation to add it to this catalog and every institution assigned to it.'
+                    : 'Simulations added to this catalog will appear here.'}
+                  actions={canManage && <Button icon={<UploadOutlined />} onClick={() => setShowWebGLUpload(true)}>Add Simulation</Button>}
+                />
+              ),
+            }}
+          />
         </div>
       ),
     },
     ...(canManage ? [{
       key: 'institutions',
-      label: `Institutions (${institutions.length})`,
+      label: `Assigned Institutions (${institutions.length})`,
       children: (
-        <div>
-          <div style={{ marginBottom: 12 }}>
-            <Button size="small" icon={<BankOutlined />} onClick={() => setShowAssign(true)}>
-              Assign to Institution
-            </Button>
-          </div>
-          {institutions.length === 0 ? (
-            <Alert type="info" showIcon title="Not assigned to any institution yet." />
-          ) : (
-            <Table dataSource={institutions} columns={instCols} rowKey="id" size="small" pagination={{ pageSize: 15 }} />
-          )}
+        <div className={a.table}>
+          <Table
+            dataSource={institutions}
+            columns={instCols}
+            rowKey="id"
+            size="small"
+            scroll={{ x: 620 }}
+            pagination={institutions.length > 15 ? { pageSize: 15, showSizeChanger: false } : false}
+            locale={{
+              emptyText: (
+                <StateBlock
+                  compact
+                  icon={<BankOutlined />}
+                  title="Not assigned to any institution"
+                  text="Assign this catalog so an institution's instructors can add its simulations to their courses."
+                  actions={<Button icon={<BankOutlined />} onClick={() => setShowAssign(true)}>Assign to Institution</Button>}
+                />
+              ),
+            }}
+          />
         </div>
       ),
     }] : []),
   ];
 
   return (
-    <div style={{ padding: '0 16px' }}>
-      {/* Header row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <div>
-          <Title level={4} style={{ margin: 0 }}>{catalog.name}</Title>
-          {catalog.description && <Text type="secondary" style={{ fontSize: 13 }}>{catalog.description}</Text>}
-        </div>
-        <Space>
-          {canManage && (
-            <Button size="small" icon={<EditOutlined />} onClick={() => setShowEdit(true)}>Edit</Button>
+    <>
+      <section className={a.card} aria-labelledby="catalog-detail-title">
+        {/* Summary */}
+        <div className={a.cardBody} style={{ borderBottom: '1px solid #F3F4F6' }}>
+          {catalog.ancestors && catalog.ancestors.length > 0 && (
+            <span className={a.breadcrumbPath}>{catalog.ancestors.map((x) => x.name).join(' › ')} ›</span>
           )}
-          <Button size="small" icon={<ArrowRightOutlined />} onClick={() => router.push(`/simulation-catalogs/${catalog.id}`)}>
-            Full page
-          </Button>
-        </Space>
-      </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ minWidth: 0, flex: '1 1 260px' }}>
+              <h2 className={a.title} id="catalog-detail-title" style={{ fontSize: 18 }}>{catalog.name}</h2>
+              <div className={a.detailMeta} style={{ marginTop: 6 }}>
+                <StatusChip status={catalog.status} />
+                <Chip tone="info">{VIS_LABEL[catalog.visibility] ?? statusLabel(catalog.visibility)}</Chip>
+                <Chip tone="neutral">{catalog.depth === 0 ? 'Root catalog' : `Level ${catalog.depth + 1}`}</Chip>
+              </div>
+              {catalog.description && <p className={a.subtitle} style={{ marginTop: 8 }}>{catalog.description}</p>}
+            </div>
+            <Button type="link" size="small" icon={<ArrowRightOutlined />} onClick={() => router.push(`/simulation-catalogs/${catalog.id}`)}>
+              Open full page
+            </Button>
+          </div>
 
-      {/* Meta badges */}
-      <div style={{ marginBottom: 16, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Tag color={VIS_COLOR[catalog.visibility] ?? 'default'} style={{ textTransform: 'capitalize' }}>
-          {catalog.visibility.replace('_', ' ')}
-        </Tag>
-        <StatusTag status={catalog.status} />
-        {catalog.depth !== undefined && (
-          <Text type="secondary" style={{ fontSize: 12 }}>Depth {catalog.depth}</Text>
-        )}
-        {catalog.ancestors && catalog.ancestors.length > 0 && (
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {catalog.ancestors.map((a) => a.name).join(' › ')} ›
-          </Text>
-        )}
-      </div>
+          <div className={a.tiles} style={{ marginTop: 14 }}>
+            <StatTile label="Simulations" value={catalog.items.length} tone="info" icon={<ExperimentOutlined />} />
+            {canManage && <StatTile label="Assigned institutions" value={institutions.length} icon={<BankOutlined />} />}
+            {canManage && <StatTile label="Direct assignments" value={directCount} />}
+          </div>
 
-      <Tabs items={tabs} size="small" />
+          {canManage && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+              <Button icon={<EditOutlined />} onClick={() => setShowEdit(true)}>Edit Catalog</Button>
+              <Button icon={<BankOutlined />} onClick={() => { setTab('institutions'); setShowAssign(true); }}>Assign to Institution</Button>
+              <Button icon={<UploadOutlined />} onClick={() => { setTab('simulations'); setShowWebGLUpload(true); }}>Add Simulation</Button>
+              <Button icon={<FolderAddOutlined />} onClick={onAddSubCatalog}>Add Sub-Catalog</Button>
+              <Button icon={<ScissorOutlined />} onClick={onMove}>Move</Button>
+              {catalog.status !== 'archived' && (
+                <Popconfirm
+                  title={`Archive "${catalog.name}"?`}
+                  description="The catalog stays assigned but is marked archived. You can set it back to Active from Edit Catalog."
+                  onConfirm={handleArchive}
+                  okText="Archive"
+                >
+                  <Button icon={<InboxOutlined />} loading={archiving}>Archive</Button>
+                </Popconfirm>
+              )}
+              <Popconfirm
+                title={`Delete "${catalog.name}"?`}
+                description="All simulations in this catalog will be unlinked. Sub-catalogs must be removed first. This cannot be undone."
+                onConfirm={onDelete}
+                okText="Delete"
+                okButtonProps={{ danger: true }}
+              >
+                <Button danger icon={<DeleteOutlined />} loading={deleting}>Delete</Button>
+              </Popconfirm>
+            </div>
+          )}
+        </div>
+
+        <Tabs className={a.tabsFlush} activeKey={tab} onChange={setTab} items={tabs} size="small" />
+      </section>
 
       {showEdit && (
         <EditCatalogModal
@@ -966,11 +1057,15 @@ function CatalogDetailPanel({
           onSuccess={() => { setShowAssign(false); onReloadDetail(); }}
         />
       )}
-    </div>
+    </>
   );
 }
 
 // -- Main Page ----------------------------------------------------------------─
+
+function countCatalogs(nodes: SimulationCatalog[]): number {
+  return nodes.reduce((n, c) => n + 1 + countCatalogs(c.children ?? []), 0);
+}
 
 export default function SimulationCatalogsPage() {
   const allowed = useRouteGuard(
@@ -993,6 +1088,7 @@ export default function SimulationCatalogsPage() {
   const [detail, setDetail] = useState<SimulationCatalogDetail | null>(null);
   const [institutions, setInstitutions] = useState<AssignedInstitution[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(false);
 
   // Modal visibility
   const [showCreate, setShowCreate] = useState(false);
@@ -1019,6 +1115,7 @@ export default function SimulationCatalogsPage() {
   // Load detail for selected node
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
+    setDetailError(false);
     try {
       const [cat, insts] = await Promise.all([
         getCatalog(id),
@@ -1028,6 +1125,7 @@ export default function SimulationCatalogsPage() {
       setInstitutions(insts);
     } catch {
       setDetail(null);
+      setDetailError(true);
     } finally {
       setDetailLoading(false);
     }
@@ -1060,101 +1158,74 @@ export default function SimulationCatalogsPage() {
   if (!allowed) return null;
 
   const selectedCatalog = detail;
+  const totalCatalogs = countCatalogs(tree);
+  const openCreateRoot = () => { setCreateParentId(undefined); setShowCreate(true); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <PageHeader
+    <div className={ADMIN_PAGE_CLASS}>
+      <AdminHeader
         title="Simulation Catalogs"
-        subtitle={canManage ? 'Manage the global catalog hierarchy' : 'Browse assigned simulation catalogs'}
-        extra={
-          canManage ? (
-            <Space>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => { setCreateParentId(undefined); setShowCreate(true); }}
-              >
-                New Catalog
-              </Button>
-              {selectedId && detail && (
-                <>
-                  <Button
-                    icon={<FolderAddOutlined />}
-                    onClick={() => { setCreateParentId(selectedId); setShowCreate(true); }}
-                  >
-                    Add Sub-Catalog
-                  </Button>
-                  <Button icon={<ScissorOutlined />} onClick={() => setShowMove(true)}>Move</Button>
-                  <Popconfirm
-                    title={`Delete "${detail.name}"?`}
-                    description="All simulations in this catalog will be unlinked. Sub-catalogs must be removed first."
-                    onConfirm={handleDelete}
-                    okText="Delete"
-                    okButtonProps={{ danger: true }}
-                  >
-                    <Button danger icon={<DeleteOutlined />} loading={deleting}>Delete</Button>
-                  </Popconfirm>
-                </>
-              )}
-            </Space>
-          ) : undefined
-        }
+        subtitle={canManage
+          ? 'Manage the global simulation catalog hierarchy and assign catalogs to institutions.'
+          : 'Browse the simulation catalogs assigned to your institution.'}
+        actions={canManage ? (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateRoot}>New Catalog</Button>
+        ) : undefined}
       />
 
-      {treeError && <Alert type="error" title={treeError} showIcon style={{ marginBottom: 16 }} />}
-
-      <div style={{ display: 'flex', flex: 1, gap: 0, minHeight: 0 }}>
-
-        {/* Left panel: tree */}
-        <div style={{
-          width: 280,
-          borderRight: '1px solid #dfdfdf',
-          padding: '12px 8px',
-          overflowY: 'auto',
-          flexShrink: 0,
-          // height: '100vh',
-          backgroundColor: '#fefefe',
-        }}>
-          <span style={{ fontSize: 12, color: '#666', display: 'block', marginBottom: 4 }}>Catalogs</span>
-
+      <div className={a.split}>
+        {/* Left: catalog tree */}
+        <AdminCard
+          className={a.treePanel}
+          title="Catalog tree"
+          icon={<AppstoreAddOutlined />}
+          helper={!treeLoading && !treeError && tree.length > 0 ? `${totalCatalogs} catalog${totalCatalogs === 1 ? '' : 's'} · simulation count per catalog` : undefined}
+          flush
+        >
           {treeLoading ? (
-            <div style={{ textAlign: 'center', padding: 32, boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.1)' }}><Spin /></div>
+            <div style={{ padding: 16 }}><Skeleton active title={false} paragraph={{ rows: 6 }} /></div>
+          ) : treeError ? (
+            <LoadErrorState compact title="Could not load catalog tree" text="The catalog hierarchy could not be loaded. Try again or check the system connection." detail={treeError} onRetry={loadTree} />
           ) : tree.length === 0 ? (
-            <div style={{ padding: 16, textAlign: 'center' }}>
-              <AppstoreAddOutlined style={{ fontSize: 32, color: '#ccc', marginBottom: 8 }} />
-              <Text type="secondary" style={{ display: 'block', fontSize: 12 }}>
-                {canManage ? 'No catalogs yet. Click "New Catalog" to get started.' : 'No catalogs assigned.'}
-              </Text>
-            </div>
-          ) : (
-
-            <Tree
-              treeData={toCatalogNodes(tree)}
-              onSelect={handleSelect}
-              selectedKeys={selectedId ? [selectedId] : []}
-              defaultExpandAll={false}
-              // showLine
-              // icon={<FolderOutlined />}
-              style={{
-                fontSize: 13,
-                backgroundColor: '#fffcfc', borderRadius: 4, padding: 4, width: '100%', height: '100%',
-                border: 'none', outline: 'none',
-              }}
-              switcherIcon={({ expanded }) => (
-                <CaretLeftOutlined
-                  style={{ transform: `rotate(${expanded ? 0 : -90}deg)`, transition: 'transform 0.3s', color: '#F59324' }}
-                />
-              )}
+            <StateBlock
+              compact
+              icon={<AppstoreAddOutlined />}
+              title={canManage ? 'No catalogs yet' : 'No catalogs assigned'}
+              text={canManage
+                ? 'Create a catalog to group simulations and assign them to institutions.'
+                : 'Catalogs assigned to your institution will appear here.'}
+              actions={canManage && <Button type="primary" icon={<PlusOutlined />} onClick={openCreateRoot}>New Catalog</Button>}
             />
+          ) : (
+            <div className={a.treeScroll}>
+              <Tree
+                blockNode
+                treeData={toCatalogNodes(tree)}
+                onSelect={handleSelect}
+                selectedKeys={selectedId ? [selectedId] : []}
+                defaultExpandAll={false}
+                switcherIcon={({ expanded }) => (
+                  <CaretDownOutlined
+                    style={{ transform: `rotate(${expanded ? 0 : -90}deg)`, transition: 'transform 0.2s', color: '#6B7280' }}
+                  />
+                )}
+              />
+            </div>
           )}
-        </div>
+        </AdminCard>
 
-        {/* Right panel: detail */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-
-
+        {/* Right: catalog details */}
+        <div style={{ minWidth: 0 }}>
           {detailLoading ? (
-            <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>
+            <AdminCard><Skeleton active paragraph={{ rows: 8 }} /></AdminCard>
+          ) : detailError && selectedId ? (
+            <div className={a.stateCard}>
+              <LoadErrorState
+                title="Could not load this catalog"
+                text="The catalog details could not be loaded. Try again or check the system connection."
+                onRetry={() => loadDetail(selectedId)}
+              />
+            </div>
           ) : selectedCatalog ? (
             <CatalogDetailPanel
               catalog={selectedCatalog}
@@ -1165,11 +1236,19 @@ export default function SimulationCatalogsPage() {
                 loadTree();
               }}
               onReloadDetail={() => loadDetail(selectedCatalog.id)}
+              onAddSubCatalog={() => { setCreateParentId(selectedCatalog.id); setShowCreate(true); }}
+              onMove={() => setShowMove(true)}
+              onDelete={handleDelete}
+              deleting={deleting}
             />
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, color: '#999', paddingTop: 60 }}>
-              <AppstoreAddOutlined style={{ fontSize: 48 }} />
-              <Text type="secondary">Select a catalog from the tree to view details</Text>
+            <div className={a.stateCard}>
+              <StateBlock
+                kind="info"
+                icon={<CarryOutOutlined />}
+                title="Select a catalog"
+                text="Choose a catalog from the tree to view simulations, assignments, and settings."
+              />
             </div>
           )}
         </div>

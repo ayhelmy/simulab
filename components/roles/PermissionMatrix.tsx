@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Tag, Typography, App } from 'antd';
 import { addRolePermission, removeRolePermission } from '@/lib/users';
 import type { RoleWithPermissions, Permission } from '@/lib/users';
@@ -23,10 +23,10 @@ export default function PermissionMatrix({ role, allPermissions, canEdit, onUpda
     setLocalGranted(new Set(role.permissions));
   }, [role.id, role.permissions.length]);
 
-  const grouped = allPermissions.reduce<Record<string, Permission[]>>((acc, p) => {
+  const grouped = useMemo(() => allPermissions.reduce<Record<string, Permission[]>>((acc, p) => {
     (acc[p.resource] ??= []).push(p);
     return acc;
-  }, {});
+  }, {}), [allPermissions]);
 
   const handleToggle = async (perm: Permission, granted: boolean) => {
     setLocalGranted(prev => {
@@ -48,7 +48,7 @@ export default function PermissionMatrix({ role, allPermissions, canEdit, onUpda
     }
   };
 
-  const resources = Object.keys(grouped).sort();
+  const resources = useMemo(() => Object.keys(grouped).sort(), [grouped]);
 
   return (
     <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: 8, padding: '1.5rem' }}>

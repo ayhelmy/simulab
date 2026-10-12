@@ -3,15 +3,15 @@
 // Next.js 16: params is a Promise — must await in server components.
 // This is a client component so we use use(params) instead.
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
 import {
   Tabs, Table, Tag, Button, Spin, Alert, Typography, Modal, Form,
   Input, Select, Popconfirm, App, Avatar, Breadcrumb, Card, Row, Col,
-  Space, Statistic, Descriptions, Upload, Progress, Radio, Tooltip,
-  type TableColumnsType,
+  Space, Statistic, Descriptions, Upload, Progress, Radio, Tooltip, Switch, InputNumber,
+  type TableColumnsType, type InputRef,
 } from 'antd';
 import {
   ArrowLeftOutlined, PlusOutlined, DeleteOutlined, ExperimentOutlined,
@@ -156,6 +156,8 @@ function EditSimulationModal({
     estimatedMinutes?: number;
     description?: string;
     learningObjectives?: string[];
+    isFeatured?: boolean;
+    featuredOrder?: number;
   }) {
     setSaving(true);
     setError(null);
@@ -176,6 +178,8 @@ function EditSimulationModal({
         description:        values.description        ?? undefined,
         thumbnailUrl:       finalThumbUrl             ?? undefined,
         learningObjectives: values.learningObjectives ?? [],
+        isFeatured:         values.isFeatured ?? false,
+        featuredOrder:      values.isFeatured ? (values.featuredOrder ?? 0) : null,
       });
 
       message.success('Simulation updated');
@@ -218,6 +222,8 @@ function EditSimulationModal({
           estimatedMinutes:   simulation.estimatedMinutes ?? undefined,
           description:        simulation.description ?? undefined,
           learningObjectives: simulation.learningObjectives ?? [],
+          isFeatured:         simulation.isFeatured ?? false,
+          featuredOrder:      simulation.featuredOrder ?? 0,
         }}
         onFinish={handleFinish}
       >
@@ -246,6 +252,24 @@ function EditSimulationModal({
         <Form.Item label="Visibility" name="visibility">
           <Select options={SIM_VIS_OPTIONS} />
         </Form.Item>
+
+        <Row gutter={12} align="middle">
+          <Col span={12}>
+            <Form.Item
+              label="Featured on Home Page"
+              name="isFeatured"
+              valuePropName="checked"
+              tooltip="Show this simulation in the Featured Simulations section of the public home page."
+            >
+              <Switch />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item label="Featured Order" name="featuredOrder" tooltip="Lower numbers appear first.">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.Item label="Description" name="description">
           <Input.TextArea rows={2} />
@@ -602,6 +626,8 @@ function UploadSimulationModal({
     visibility: string;
     estimatedMinutes?: number;
     status: string;
+    isFeatured?: boolean;
+    featuredOrder?: number;
   }) {
     if (!zipFile) { setError('Please select a ZIP file.'); return; }
     setUploading(true);
@@ -618,6 +644,8 @@ function UploadSimulationModal({
           status:           values.status    as Simulation['status'],
           estimatedMinutes: values.estimatedMinutes,
           thumbnailUrl:     thumbUrl ?? undefined,
+          isFeatured:       values.isFeatured,
+          featuredOrder:    values.isFeatured ? (values.featuredOrder ?? 0) : undefined,
         },
         zipFile,
         setProgress,
@@ -698,9 +726,28 @@ function UploadSimulationModal({
           </Col>
         </Row>
 
-        <Form.Item label="Status" name="status">
-          <Select options={STATUS_OPTIONS} style={{ width: 160 }} />
-        </Form.Item>
+        <Row gutter={12} align="middle">
+          <Col span={8}>
+            <Form.Item label="Status" name="status">
+              <Select options={STATUS_OPTIONS} />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item
+              label="Featured on Home Page"
+              name="isFeatured"
+              valuePropName="checked"
+              tooltip="Show this simulation in the Featured Simulations section of the public home page."
+            >
+              <Switch />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Featured Order" name="featuredOrder" tooltip="Lower numbers appear first.">
+              <InputNumber min={0} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+        </Row>
 
         <Form.Item label="WebGL ZIP file" required>
           <Upload
@@ -984,6 +1031,7 @@ function UnassignImpactModal({
   const [confirmText,   setConfirmText]   = useState('');
   const [unassigning,   setUnassigning]   = useState(false);
   const { message }  = App.useApp();
+  const inputRef     = useRef<InputRef>(null);
 
   useEffect(() => {
     setLoadingImpact(true);
@@ -1064,13 +1112,13 @@ function UnassignImpactModal({
               />
               <Row gutter={16} style={{ marginBottom: 16 }}>
                 <Col span={8}>
-                  <Statistic title="Affected Courses"  value={impact.affectedCourses}  valueStyle={{ color: '#d46b08' }} />
+                  <Statistic title="Affected Courses"  value={impact.affectedCourses}  style={{ color: '#d46b08' }} />
                 </Col>
                 <Col span={8}>
-                  <Statistic title="Affected Lessons"  value={impact.affectedLessons}  valueStyle={{ color: '#d46b08' }} />
+                  <Statistic title="Affected Lessons"  value={impact.affectedLessons}  style={{ color: '#d46b08' }} />
                 </Col>
                 <Col span={8}>
-                  <Statistic title="Affected Students" value={impact.affectedStudents} valueStyle={{ color: '#d46b08' }} />
+                  <Statistic title="Affected Students" value={impact.affectedStudents} style={{ color: '#d46b08' }} />
                 </Col>
               </Row>
               {impact.warnings.map((w, i) => (
@@ -1097,6 +1145,7 @@ function UnassignImpactModal({
               Type <Typography.Text code>{CONFIRM_KEYWORD}</Typography.Text> to confirm:
             </Typography.Text>
             <Input
+              ref={inputRef}
               style={{ marginTop: 8 }}
               placeholder={CONFIRM_KEYWORD}
               value={confirmText}
@@ -1228,6 +1277,13 @@ export default function CatalogDetailPage({ params }: Props) {
       dataIndex: 'status',
       width: 100,
       render: (s: string) => <StatusTag status={s} />,
+    },
+    {
+      title: 'Featured',
+      dataIndex: 'isFeatured',
+      width: 90,
+      align: 'center' as const,
+      render: (v: boolean | undefined) => v ? <Tag color="#F59324">Featured</Tag> : null,
     },
     ...(canManage ? [{
       title: '',

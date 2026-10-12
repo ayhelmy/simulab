@@ -1,32 +1,20 @@
 'use client';
 
-import React, { useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/context/AuthContext';
+import React, { Suspense } from 'react';
+import Image from 'next/image';
 import { Spin } from 'antd';
-
-function CenteredSpinner() {
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <Spin size="large" />
-    </div>
-  );
-}
+import { useGuestOnly } from '@/hooks/useGuestOnly';
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const canRender = useGuestOnly();
 
-  useEffect(() => {
-    if (!loading && user) {
-      const next = searchParams.get('next') || '/dashboard';
-      router.replace(next);
-    }
-  }, [user, loading, router, searchParams]);
-
-  // loading, or already authenticated and mid-redirect — never render blank.
-  if (loading || user) return <CenteredSpinner />;
+  if (!canRender) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return <>{children}</>;
 }
@@ -37,7 +25,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Brand */}
       <div className="auth-brand">
         <div className="auth-brand-badge">
-                     <img src="/Virtual-logo-1.png" alt="SimuLearn Logo" style={{ width: 50, height: 40 ,color: '#fff'}} />
+          <Image src="/Virtual-logo-1.png" alt="SimuLearn Logo" width={50} height={40} />
 
           <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, letterSpacing: '-0.3px' }}>
            Bedo SimuLearn
@@ -57,7 +45,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           padding: '2rem',
         }}
       >
-        <Suspense fallback={<CenteredSpinner />}>
+        <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="large" /></div>}>
           <AuthGuard>{children}</AuthGuard>
         </Suspense>
       </div>

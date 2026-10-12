@@ -32,7 +32,7 @@ const { RangePicker } = DatePicker;
 const STATUS_COLORS: Record<string, string> = {
   ended:     'green',
   active:    'blue',
-  abandoned: 'orange',
+  abandoned: 'gold',
   expired:   'red',
 };
 
@@ -70,7 +70,7 @@ const COLUMNS: ColumnsType<SimulationActivitySession> = [
     ellipsis: true,
     render:   (_, row) => (
       <Space size={4}>
-        <ExperimentOutlined style={{ color: '#7C3AED', fontSize: 12 }} />
+        <ExperimentOutlined style={{ color: '#5C98B7', fontSize: 12 }} />
         <Text style={{ fontSize: 13 }}>{row.simulationTitle ?? '—'}</Text>
       </Space>
     ),
@@ -169,7 +169,7 @@ export default function MySimulationActivityPage() {
 
       <Space align="start" style={{ marginBottom: 20, width: '100%', justifyContent: 'space-between' }} wrap>
         <Title level={4} style={{ margin: 0 }}>
-          <ClockCircleOutlined style={{ marginRight: 8, color: '#7C3AED' }} />
+          <ClockCircleOutlined style={{ marginRight: 8, color: '#5C98B7' }} />
           My Simulation Activity
         </Title>
         <Button icon={<ReloadOutlined />} onClick={loadData} loading={loading}>

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   Layout, Menu, Button, Drawer, Avatar, Dropdown, Space, Typography,
   type MenuProps,
 } from 'antd';
 import {
-  MenuOutlined, ExperimentOutlined, UserOutlined,
+  MenuOutlined, UserOutlined,
   DashboardOutlined, LogoutOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '@/context/AuthContext';
@@ -17,14 +18,17 @@ const { Text } = Typography;
 
 const NAV_ITEMS: MenuProps['items'] = [
   { key: '/',              label: 'Home' },
-  { key: '/public-catalog',       label: 'Simulation Catalog' },
-  { key: '/disciplines',   label: 'Disciplines' },
-  { key: '/why-simlearn',  label: 'Why BEDO' },
+  { key: '/public-catalog', label: 'Simulation Catalog' },
+  { key: '/about',         label: 'About us' },
   { key: '/resources',     label: 'Resources' },
-  { key: '/about',         label: 'About Us' },
 ];
 
-export default function PublicHeader() {
+interface Props {
+  /** Extra vertical offset (px) to sit below a fixed bar above the header, e.g. the home page's announcement bar. */
+  topOffset?: number;
+}
+
+export default function PublicHeader({ topOffset = 0 }: Props) {
   const router   = useRouter();
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
@@ -63,10 +67,11 @@ export default function PublicHeader() {
   ];
 
   return (
-    <Header className="public-header">
+    <Header className="public-header" style={{ top: topOffset }}>
       {/* Logo */}
       <button className="public-logo" onClick={() => router.push('/')} aria-label="BEDO home">
-        <img src="/bedo-logo.png" alt="BEDO" style={{ height: 46, display: 'block' }} />
+        <Image src="/bedo-logo.png" alt="BEDO" width={75} height={32} style={{ display: 'block' }} priority />
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#0D1117' }}>SimuLearn</span>
       </button>
 
       {/* Desktop nav */}
@@ -99,18 +104,19 @@ export default function PublicHeader() {
         ) : (
           <Space size={8}>
             <Button
+              type="text"
               onClick={() => router.push('/login')}
               className="public-btn-login"
+              style={{ fontWeight: 800 }}
             >
-              Log In
+              Login
             </Button>
             <Button
               type="primary"
               onClick={() => router.push('/register')}
               className="public-btn-demo"
-              icon={<ExperimentOutlined />}
             >
-              Get Started
+              Book Demo
             </Button>
           </Space>
         )}
@@ -127,7 +133,10 @@ export default function PublicHeader() {
       {/* Mobile drawer */}
       <Drawer
         title={
-          <img src="/bedo-logo.png" alt="BEDO" style={{ height: 46, display: 'block' }} />
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Image src="/bedo-logo.png" alt="BEDO" width={110} height={39} style={{ display: 'block' }} />
+            <span style={{ fontSize: 17, fontWeight: 700, color: '#0D1117' }}>SimuLearn</span>
+          </span>
         }
         placement="right"
         onClose={() => setDrawerOpen(false)}

@@ -12,6 +12,7 @@ import type { User } from '@/types';
 import { silentRefresh, logout as authLogout } from '@/lib/auth';
 import { setAccessToken } from '@/lib/api';
 import { getInstitution } from '@/lib/institutions';
+import { DEV_MOCK_AUTH, getDevMockUser } from '@/lib/devMock';
 
 interface AuthState {
   user: User | null;
@@ -56,6 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Restore session from HttpOnly refresh cookie on mount
   useEffect(() => {
+    // DEV ONLY — fake student or instructor session (?mockRole=…) when the backend is not available (lib/devMock.ts)
+    if (DEV_MOCK_AUTH) {
+      setUser(getDevMockUser());
+      setLoading(false);
+      return;
+    }
     silentRefresh().then((result) => {
       if (result) {
         setAccessToken(result.accessToken);

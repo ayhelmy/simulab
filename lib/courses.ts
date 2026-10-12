@@ -78,6 +78,13 @@ export async function getCourse(id: string): Promise<Course> {
   return res.data;
 }
 
+/** Actively-enrolled courses for the current user — unlike listCourses(), not filtered
+ * by the student's "current semester term" catalog-browsing rule. */
+export async function listMyEnrolledCourses(): Promise<Course[]> {
+  const res = await api.get<Course[]>('/courses/me/enrolled');
+  return res.data ?? [];
+}
+
 export async function createCourse(data: CreateCourseData): Promise<Course> {
   const res = await api.post<Course>('/courses', data);
   return res.data;

@@ -47,7 +47,7 @@ interface Props { params: Promise<{ id: string }> }
 const STATUS_COLORS: Record<string, string> = {
   ended:     'green',
   active:    'blue',
-  abandoned: 'orange',
+  abandoned: 'gold',
   expired:   'red',
 };
 
@@ -72,7 +72,8 @@ function StudentName({ row }: { row: InstructorActivitySession }) {
 // Shows every individual click in sequence order with its component name and
 // coordinates. Uncategorized clicks (outside all annotated regions) are hidden.
 
-const CATEGORY_COLORS = ['#7C3AED', '#1677FF', '#059669', '#F59E0B', '#EF4444', '#0891B2', '#DB2777', '#65A30D'];
+// BEDO categorical palette (brand blue / orange first, then semantic and deep tones).
+const CATEGORY_COLORS = ['#5C98B7', '#F59324', '#059669', '#D97706', '#2F5A70', '#DC2626', '#92400E', '#6B7280'];
 
 function ClickStatsModal({
   session,
@@ -126,7 +127,7 @@ function ClickStatsModal({
       dataIndex: 'sequenceNo',
       width:     48,
       render:    (n: number) => (
-        <Avatar size={22} style={{ background: '#F1F5F9', color: '#475569', fontSize: 11 }}>{n}</Avatar>
+        <Avatar size={22} style={{ background: '#F3F4F6', color: '#374151', fontSize: 11 }}>{n}</Avatar>
       ),
     },
     {
@@ -135,7 +136,7 @@ function ClickStatsModal({
       width:  90,
       render: (t: string) => (
         <Space size={4}>
-          <ClockCircleOutlined style={{ color: '#94A3B8', fontSize: 11 }} />
+          <ClockCircleOutlined style={{ color: '#9CA3AF', fontSize: 11 }} />
           <Text style={{ fontSize: 12, fontFamily: 'monospace' }}>{t}</Text>
         </Space>
       ),
@@ -157,7 +158,7 @@ function ClickStatsModal({
       width={680}
       title={
         <Space>
-          <ClusterOutlined style={{ color: '#7C3AED' }} />
+          <ClusterOutlined style={{ color: '#5C98B7' }} />
           Component Interactions
         </Space>
       }
@@ -178,7 +179,7 @@ function ClickStatsModal({
           <>
             <div style={{ marginBottom: 12 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                <AimOutlined style={{ color: '#7C3AED', marginRight: 6 }} />
+                <AimOutlined style={{ color: '#5C98B7', marginRight: 6 }} />
                 {total} interaction{total === 1 ? '' : 's'} · ordered by sequence
               </Text>
             </div>
@@ -243,7 +244,7 @@ export default function CourseActivityPage({ params }: Props) {
           <Tooltip title="View simulation analytics">
             <Link
               href={`/courses/${courseId}/simulations/${row.simulationId}/analytics`}
-              style={{ fontSize: 13, color: '#7C3AED' }}
+              style={{ fontSize: 13, color: '#E07B15', fontWeight: 500 }}
             >
               {row.simulationTitle ?? '—'}
             </Link>
@@ -286,58 +287,58 @@ export default function CourseActivityPage({ params }: Props) {
       width:  100,
       render: (_: unknown, row: InstructorActivitySession) => (
         <Tag color={STATUS_COLORS[row.status] ?? 'default'} style={{ fontSize: 11 }}>
-          {row.status.toUpperCase()}
+          {row.status.charAt(0).toUpperCase() + row.status.slice(1)}
         </Tag>
       ),
     },
-    {
-      title:  'Steps',
-      key:    'stepsStatus',
-      width:  100,
-      align:  'center' as const,
-      render: (_: unknown, row: InstructorActivitySession) => {
-        if (row.stepsStatus === 'passed') {
-          return (
-            <Tooltip title="All steps completed in sequence">
-              <Tag icon={<CheckCircleOutlined />} color="success" style={{ fontSize: 11 }}>
-                Passed
-              </Tag>
-            </Tooltip>
-          );
-        }
-        if (row.stepsStatus === 'failed') {
-          return (
-            <Tooltip title="Steps not completed in sequence">
-              <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: 11 }}>
-                Failed
-              </Tag>
-            </Tooltip>
-          );
-        }
-        return (
-          <Tooltip title="No steps defined for this simulation">
-            <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
-          </Tooltip>
-        );
-      },
-    },
-    {
-      title:  'Interactions',
-      key:    'interactions',
-      width:  130,
-      align:  'center' as const,
-      render: (_: unknown, row: InstructorActivitySession) => (
-        <Tooltip title="View component interaction summary">
-          <Button
-            size="small"
-            icon={<AimOutlined />}
-            onClick={() => setStatsTarget(row)}
-          >
-            View Stats
-          </Button>
-        </Tooltip>
-      ),
-    },
+    // {
+    //   title:  'Steps',
+    //   key:    'stepsStatus',
+    //   width:  100,
+    //   align:  'center' as const,
+    //   render: (_: unknown, row: InstructorActivitySession) => {
+    //     if (row.stepsStatus === 'passed') {
+    //       return (
+    //         <Tooltip title="All steps completed in sequence">
+    //           <Tag icon={<CheckCircleOutlined />} color="success" style={{ fontSize: 11 }}>
+    //             Passed
+    //           </Tag>
+    //         </Tooltip>
+    //       );
+    //     }
+    //     if (row.stepsStatus === 'failed') {
+    //       return (
+    //         <Tooltip title="Steps not completed in sequence">
+    //           <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: 11 }}>
+    //             Failed
+    //           </Tag>
+    //         </Tooltip>
+    //       );
+    //     }
+    //     return (
+    //       <Tooltip title="No steps defined for this simulation">
+    //         <Text type="secondary" style={{ fontSize: 11 }}>—</Text>
+    //       </Tooltip>
+    //     );
+    //   },
+    // },
+    // {
+    //   title:  'Interactions',
+    //   key:    'interactions',
+    //   width:  130,
+    //   align:  'center' as const,
+    //   render: (_: unknown, row: InstructorActivitySession) => (
+    //     <Tooltip title="View component interaction summary">
+    //       <Button
+    //         size="small"
+    //         icon={<AimOutlined />}
+    //         onClick={() => setStatsTarget(row)}
+    //       >
+    //         View Stats
+    //       </Button>
+    //     </Tooltip>
+    //   ),
+    // },
   ], []);
 
   const loadData = useCallback(async () => {
@@ -392,7 +393,7 @@ export default function CourseActivityPage({ params }: Props) {
       <Space align="start" style={{ marginBottom: 20, width: '100%', justifyContent: 'space-between' }} wrap>
         <div>
           <Title level={4} style={{ margin: 0 }}>
-            <BarChartOutlined style={{ marginRight: 8, color: '#7C3AED' }} />
+            <BarChartOutlined style={{ marginRight: 8, color: '#5C98B7' }} />
             Simulation Activity
           </Title>
           {course && (
@@ -418,38 +419,38 @@ export default function CourseActivityPage({ params }: Props) {
       {summary && (
         <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
           <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
+            <Card size="small" style={{ borderRadius: 12, textAlign: 'center', height: '100%' }}>
               <Statistic
                 title="Total Launches"
                 value={summary.totalLaunches}
-                prefix={<ThunderboltOutlined style={{ color: '#7C3AED' }} />}
+                prefix={<ThunderboltOutlined style={{ color: '#5C98B7' }} />}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
+            <Card size="small" style={{ borderRadius: 12, textAlign: 'center', height: '100%' }}>
               <Statistic
                 title="Unique Students"
                 value={summary.uniqueStudents}
-                prefix={<TeamOutlined style={{ color: '#1677FF' }} />}
+                prefix={<TeamOutlined style={{ color: '#F59324' }} />}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
+            <Card size="small" style={{ borderRadius: 12, textAlign: 'center', height: '100%' }}>
               <Statistic
                 title="Total Duration"
                 value={summary.formattedTotalDuration}
-                prefix={<ClockCircleOutlined style={{ color: '#059669' }} />}
+                prefix={<ClockCircleOutlined style={{ color: '#5C98B7' }} />}
               />
             </Card>
           </Col>
           <Col xs={12} sm={6}>
-            <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
+            <Card size="small" style={{ borderRadius: 12, textAlign: 'center', height: '100%' }}>
               <Statistic
                 title="Avg Duration"
                 value={summary.formattedAvgDuration}
-                prefix={<ClockCircleOutlined style={{ color: '#F59E0B' }} />}
+                prefix={<ClockCircleOutlined style={{ color: '#2F5A70' }} />}
               />
             </Card>
           </Col>
@@ -457,7 +458,7 @@ export default function CourseActivityPage({ params }: Props) {
       )}
 
       {/* Filters */}
-      <Card size="small" style={{ marginBottom: 16, borderRadius: 8 }}>
+      <Card size="small" style={{ marginBottom: 16, borderRadius: 12 }}>
         <Space wrap size={12}>
           <Select
             placeholder="Filter by status"
@@ -489,7 +490,7 @@ export default function CourseActivityPage({ params }: Props) {
       </Card>
 
       {/* Table */}
-      <Card style={{ borderRadius: 8 }}>
+      <Card style={{ borderRadius: 12 }}>
         <Spin spinning={loading}>
           {!loading && sessions.length === 0 ? (
             <Empty

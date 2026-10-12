@@ -14,6 +14,7 @@ interface Props {
 export default function PageHeader({ title, subtitle, extra }: Props) {
   return (
     <div
+      className="page-header"
       style={{
         display: 'flex',
         justifyContent: 'space-between',

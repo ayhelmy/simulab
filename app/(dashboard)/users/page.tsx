@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouteGuard } from '@/hooks/useRouteGuard';
+import { useAuth } from '@/context/AuthContext';
 import PermissionGuard from '@/components/layout/PermissionGuard';
 import UserTable from '@/components/users/UserTable';
 import UserModal from '@/components/users/UserModal';
@@ -10,23 +11,26 @@ import RoleAssignModal from '@/components/users/RoleAssignModal';
 import { listUsers, updateUser, deleteUser } from '@/lib/users';
 import type { User } from '@/types';
 import type { PaginationMeta } from '@/types/api';
+import { Input, Select, Button, Pagination, Tooltip, App } from 'antd';
+import { PlusOutlined, UploadOutlined, SearchOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons';
 import {
-  Input, Select, Button, Alert, Pagination, Row, Col, Typography, App,
-} from 'antd';
-import { PlusOutlined, UploadOutlined, SearchOutlined } from '@ant-design/icons';
-import PageHeader from '@/components/common/PageHeader';
+  ADMIN_PAGE_CLASS, AdminHeader, AdminCard, Toolbar, ToolbarFilter, ResultCount,
+  StateBlock, LoadErrorState,
+} from '@/components/admin/adminUi';
 
-const { Search } = Input;
-const { Text } = Typography;
+const ROLE_LABEL: Record<string, string> = {
+  super_admin: 'Super Admin', institution_admin: 'Institution Admin', dept_manager: 'Department Manager',
+  instructor: 'Instructor', teaching_assistant: 'Teaching Assistant', student: 'Student', guest: 'Guest',
+};
 
-const ROLE_OPTIONS = [
-  'super_admin', 'institution_admin', 'dept_manager',
-  'instructor', 'teaching_assistant', 'student', 'guest',
-].map((r) => ({ value: r, label: r.replace(/_/g, ' ') }));
+const ROLE_OPTIONS = Object.entries(ROLE_LABEL).map(([value, label]) => ({ value, label }));
 
 export default function UsersPage() {
   const allowed = useRouteGuard('users.view_institution', 'users.view_all', 'users.view_department');
   const { message } = App.useApp();
+  const { hasPermission } = useAuth();
+  // Super Admin sees every institution; institution and department admins see their own.
+  const platformScope = hasPermission('users.view_all');
 
   const [users, setUsers]     = useState<User[]>([]);
   const [meta, setMeta]       = useState<PaginationMeta | null>(null);
@@ -93,12 +97,21 @@ export default function UsersPage() {
 
   if (!allowed) return null;
 
+  const hasFilters = !!(search || status || role);
+  // Platform-only roles are not offered to institution-scoped admins.
+  const roleOptions = platformScope ? ROLE_OPTIONS : ROLE_OPTIONS.filter((o) => o.value !== 'super_admin' && o.value !== 'guest');
+  function clearFilters() {
+    setSearchInput(''); setSearch(''); setStatus(undefined); setRole(undefined); setPage(1);
+  }
+
   return (
-    <div>
-      <PageHeader
-        title="User Management"
-        subtitle={meta ? `${meta.total} user${meta.total !== 1 ? 's' : ''} total` : undefined}
-        extra={
+    <div className={ADMIN_PAGE_CLASS}>
+      <AdminHeader
+        title={platformScope ? 'User Management' : 'Institution Users'}
+        subtitle={platformScope
+          ? 'Manage platform users, roles, access, and institution assignments.'
+          : 'Manage your institution’s users, their roles, and their academic assignments.'}
+        actions={
           <PermissionGuard permission="users.create">
             <Button icon={<UploadOutlined />} onClick={() => setImportModal(true)}>Bulk Import</Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setUserModal({ open: true })}>
@@ -108,70 +121,113 @@ export default function UsersPage() {
         }
       />
 
-      {/* Filters */}
-      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
-        <Col flex="1 1 240px">
-          <Search
-            placeholder="Search by name or email…"
-            prefix={<SearchOutlined />}
-            value={searchInput}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
-            allowClear
+      <AdminCard
+        flush
+        toolbar={
+          <Toolbar
+            search={
+              <Input
+                placeholder="Search by name or email"
+                aria-label="Search users by name or email"
+                prefix={<SearchOutlined style={{ color: '#9CA3AF' }} />}
+                value={searchInput}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchInput(e.target.value)}
+                allowClear
+              />
+            }
+            filters={
+              <>
+                <ToolbarFilter>
+                  <Select
+                    placeholder="All statuses"
+                    aria-label="Filter by status"
+                    value={status}
+                    onChange={(v: string | undefined) => { setStatus(v); setPage(1); }}
+                    allowClear
+                    style={{ width: '100%' }}
+                    options={[
+                      { value: 'active',    label: 'Active' },
+                      { value: 'suspended', label: 'Suspended' },
+                      { value: 'pending',   label: 'Pending' },
+                    ]}
+                  />
+                </ToolbarFilter>
+                <ToolbarFilter>
+                  <Select
+                    placeholder="All roles"
+                    aria-label="Filter by role"
+                    value={role}
+                    onChange={(v: string | undefined) => { setRole(v); setPage(1); }}
+                    allowClear
+                    style={{ width: '100%' }}
+                    options={roleOptions}
+                  />
+                </ToolbarFilter>
+                {hasFilters && <Button type="link" onClick={clearFilters} style={{ paddingInline: 4 }}>Clear filters</Button>}
+              </>
+            }
+            end={
+              <>
+                {!error && <ResultCount total={meta?.total} noun="user" />}
+                <Tooltip title="Refresh">
+                  <Button icon={<ReloadOutlined />} aria-label="Refresh users" onClick={load} loading={loading && !!users.length} />
+                </Tooltip>
+              </>
+            }
           />
-        </Col>
-        <Col flex="0 0 160px">
-          <Select
-            placeholder="All Statuses"
-            value={status}
-            onChange={(v: string | undefined) => { setStatus(v); setPage(1); }}
-            allowClear
-            style={{ width: '100%' }}
-            options={[
-              { value: 'active',    label: 'Active' },
-              { value: 'suspended', label: 'Suspended' },
-              { value: 'pending',   label: 'Pending' },
-            ]}
+        }
+      >
+        {error ? (
+          <LoadErrorState
+            title="Could not load users"
+            text="The user list could not be loaded. Check the connection or try again."
+            detail={error}
+            onRetry={load}
           />
-        </Col>
-        <Col flex="0 0 200px">
-          <Select
-            placeholder="All Roles"
-            value={role}
-            onChange={(v: string | undefined) => { setRole(v); setPage(1); }}
-            allowClear
-            style={{ width: '100%' }}
-            options={ROLE_OPTIONS}
+        ) : (
+          <UserTable
+            users={users}
+            loading={loading}
+            onEdit={(user) => setUserModal({ open: true, user })}
+            onAssignRole={(user) => setRoleModal({ open: true, user })}
+            onSuspend={handleSuspend}
+            onDelete={handleDelete}
+            onEditAcademic={(user) => setUserModal({ open: true, user })}
+            emptyState={hasFilters ? (
+              <StateBlock
+                kind="no-match"
+                title="No users match your filters"
+                text="Try a different name or email, or clear the status and role filters."
+                actions={<Button onClick={clearFilters}>Clear filters</Button>}
+              />
+            ) : (
+              <StateBlock
+                icon={<TeamOutlined />}
+                title="No users found"
+                text={platformScope
+                  ? 'Users will appear here once they are added or synced from an institution.'
+                  : 'Users will appear here once they are added to your institution or imported in bulk.'}
+              />
+            )}
           />
-        </Col>
-      </Row>
+        )}
 
-      {error && <Alert type="error" title={error} showIcon style={{ marginBottom: 16 }} />}
-
-      <UserTable
-        users={users}
-        loading={loading}
-        onEdit={(user) => setUserModal({ open: true, user })}
-        onAssignRole={(user) => setRoleModal({ open: true, user })}
-        onSuspend={handleSuspend}
-        onDelete={handleDelete}
-        onEditAcademic={(user) => setUserModal({ open: true, user })}
-      />
-
-      {meta && meta.totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
-          <Text type="secondary" style={{ fontSize: 13 }}>
-            {((page - 1) * meta.limit) + 1}–{Math.min(page * meta.limit, meta.total)} of {meta.total}
-          </Text>
-          <Pagination
-            current={page}
-            total={meta.total}
-            pageSize={meta.limit}
-            onChange={setPage}
-            showSizeChanger={false}
-            size="small"
-          />
-        </div>
-      )}
+        {!error && meta && meta.totalPages > 1 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderTop: '1px solid #F3F4F6' }}>
+            <span style={{ fontSize: 13, color: '#6B7280' }}>
+              Showing {((page - 1) * meta.limit) + 1}–{Math.min(page * meta.limit, meta.total)} of {meta.total.toLocaleString()}
+            </span>
+            <Pagination
+              current={page}
+              total={meta.total}
+              pageSize={meta.limit}
+              onChange={setPage}
+              showSizeChanger={false}
+              size="small"
+            />
+          </div>
+        )}
+      </AdminCard>
 
       {/* Modals */}
       {userModal.open && (
