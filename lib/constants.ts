@@ -5,7 +5,12 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://172.20.4
 // Large multipart uploads (WebGL builds, lesson files) go straight to the
 // backend instead of through the /api/v1 rewrite proxy, which caps request
 // body size. They authenticate with the Bearer token, so no cookie is needed.
-export const UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL || API_BASE_URL;
+// A bare host ("x.up.railway.app/api/v1") would be resolved as a relative
+// path on the frontend's own domain, so default it to https://.
+const RAW_UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL?.trim();
+export const UPLOAD_API_URL = !RAW_UPLOAD_API_URL
+  ? API_BASE_URL
+  : /^(https?:\/\/|\/)/i.test(RAW_UPLOAD_API_URL) ? RAW_UPLOAD_API_URL : `https://${RAW_UPLOAD_API_URL}`;
 
 export const ACCESS_TOKEN_KEY = 'sl_access_token';  // in-memory only (never localStorage)
 

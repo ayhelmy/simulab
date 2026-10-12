@@ -5,7 +5,15 @@ import type { NextConfig } from 'next';
 // refresh cookie is first-party to the frontend domain — required because
 // *.vercel.app and *.up.railway.app are different sites (SameSite=Strict
 // cookies would never be sent, and proxy.ts could never see the session).
-const BACKEND_URL = process.env.BACKEND_URL?.replace(/\/+$/, '');
+// Accepts a bare host ("x.up.railway.app") as well as a full URL — Next.js
+// rejects rewrite destinations that don't start with http(s)://.
+function normalizeBackendUrl(raw: string | undefined): string | undefined {
+  const value = raw?.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+  if (!value) return undefined;
+  return /^https?:\/\//i.test(value) ? value : `https://${value}`;
+}
+
+const BACKEND_URL = normalizeBackendUrl(process.env.BACKEND_URL);
 
 const nextConfig: NextConfig = {
   devIndicators: false,
