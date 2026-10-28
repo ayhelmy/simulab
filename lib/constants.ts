@@ -1,16 +1,33 @@
 // SRS §4.1: token TTLs, pagination defaults, role lists.
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://172.20.44.1:5000/api/v1';
+// A bare host ("x.up.railway.app/api/v1") would be resolved as a relative
+// path on the frontend's own domain, so default it to https://.
+function normalizeApiUrl(raw: string | undefined): string | undefined {
+  const value = raw?.trim().replace(/^["']|["']$/g, '').replace(/\/+$/, '');
+  if (!value) return undefined;
+  return /^(https?:\/\/|\/)/i.test(value) ? value : `https://${value}`;
+}
+
+const PROXY_API_PATH = '/api/v1';
+
+// The dev LAN address is only a local fallback; production builds without
+// NEXT_PUBLIC_API_URL use the same-origin proxy instead.
+const DIRECT_API_URL =
+  normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL) ??
+  (process.env.NODE_ENV === 'production' ? PROXY_API_PATH : 'https://172.20.44.1:5000/api/v1');
+
+// A Railway backend is a different site from the frontend, so the SameSite
+// refresh cookie would never be sent cross-origin. Route those calls through
+// the /api/v1 rewrite in next.config.ts, which derives its destination from
+// this same URL when BACKEND_URL isn't set.
+const isRailwayUrl = (url: string) => /^https?:\/\/[^/]+\.up\.railway\.app(\/|$)/i.test(url);
+
+export const API_BASE_URL = isRailwayUrl(DIRECT_API_URL) ? PROXY_API_PATH : DIRECT_API_URL;
 
 // Large multipart uploads (WebGL builds, lesson files) go straight to the
 // backend instead of through the /api/v1 rewrite proxy, which caps request
 // body size. They authenticate with the Bearer token, so no cookie is needed.
-// A bare host ("x.up.railway.app/api/v1") would be resolved as a relative
-// path on the frontend's own domain, so default it to https://.
-const RAW_UPLOAD_API_URL = process.env.NEXT_PUBLIC_UPLOAD_API_URL?.trim();
-export const UPLOAD_API_URL = !RAW_UPLOAD_API_URL
-  ? API_BASE_URL
-  : /^(https?:\/\/|\/)/i.test(RAW_UPLOAD_API_URL) ? RAW_UPLOAD_API_URL : `https://${RAW_UPLOAD_API_URL}`;
+export const UPLOAD_API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_UPLOAD_API_URL) ?? DIRECT_API_URL;
 
 export const ACCESS_TOKEN_KEY = 'sl_access_token';  // in-memory only (never localStorage)
 

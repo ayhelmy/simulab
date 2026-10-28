@@ -13,7 +13,22 @@ function normalizeBackendUrl(raw: string | undefined): string | undefined {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`;
 }
 
-const BACKEND_URL = normalizeBackendUrl(process.env.BACKEND_URL);
+// Without BACKEND_URL, fall back to the origin of an absolute Railway
+// NEXT_PUBLIC_API_URL — lib/constants.ts routes such URLs through this rewrite.
+function railwayOriginFromApiUrl(raw: string | undefined): string | undefined {
+  const value = normalizeBackendUrl(raw);
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.hostname.endsWith('.up.railway.app') ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const BACKEND_URL =
+  normalizeBackendUrl(process.env.BACKEND_URL) ??
+  railwayOriginFromApiUrl(process.env.NEXT_PUBLIC_API_URL);
 
 const nextConfig: NextConfig = {
   devIndicators: false,
