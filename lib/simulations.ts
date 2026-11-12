@@ -548,8 +548,10 @@ export async function uploadWebGLSimulation(
     // Match the credentials behavior used by the shared API helper.
     xhr.withCredentials = true;
 
-    // Unity ZIP extraction may require several minutes.
-    xhr.timeout = 10 * 60 * 1000;
+    // Covers the whole transfer *plus* server-side extraction. Must stay above
+    // the backend's UPLOAD_REQUEST_TIMEOUT_MIN (30 min) — a 350 MB ZIP on a
+    // ~5 Mbps uplink alone needs ~10 min, so the old 10 min cap was too tight.
+    xhr.timeout = 45 * 60 * 1000;
 
     xhr.setRequestHeader('Accept', 'application/json');
 
@@ -562,13 +564,14 @@ export async function uploadWebGLSimulation(
     // Do not manually set Content-Type.
     // The browser must generate the multipart boundary.
 
-    if (onProgress) {
-      xhr.upload.addEventListener('progress', (event) => {
-        if (event.lengthComputable) {
-          onProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      });
-    }
+    const startedAt = Date.now();
+    let lastPercent = 0;
+    xhr.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) {
+        lastPercent = Math.round((event.loaded / event.total) * 100);
+        onProgress?.(lastPercent);
+      }
+    });
 
     xhr.onload = () => {
       let body: Record<string, any> = {};
@@ -610,10 +613,17 @@ export async function uploadWebGLSimulation(
         response: xhr.responseText,
       });
 
+      const minutes = Math.round((Date.now() - startedAt) / 60_000);
       reject({
         title: 'Upload network error',
         detail:
-          'The browser blocked or lost the upload request. Check CORS, the request URL, proxy upload limits, and the backend logs.',
+          lastPercent > 0
+            // Bytes were flowing, so CORS/URL are fine — the connection was
+            // closed mid-transfer (server request timeout, proxy limit, or a
+            // dropped network).
+            ? `The connection was closed after ${lastPercent}% (${minutes} min). ` +
+              'The server or a proxy likely timed out on this large file. Try again on a faster connection, or ask an administrator to raise the upload timeout.'
+            : 'The browser blocked or lost the upload request before any data was sent. Check CORS, the request URL, and the backend logs.',
       });
     };
 
