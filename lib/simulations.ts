@@ -3,10 +3,10 @@
  * Tree-based catalog support added in migration 018.
  */
 
-import { api, authFetch, getAccessToken } from './api';
+import { api, authFetch } from './api';
 import { API_BASE_URL, UPLOAD_API_URL } from './constants';
 import type { Simulation, SimulationCatalog, SimulationDetail, WebGLLaunchResult } from '@/types';
-import type { PaginationMeta } from '@/types/api';
+import type { ApiSuccess, PaginationMeta } from '@/types/api';
 
 // ── Query / input types ───────────────────────────────────────────────────────
 
@@ -507,14 +507,59 @@ export interface WebGLUploadData {
   featuredOrder?: number;
 }
 
+/** Attempts per chunk before giving up (network blips, 5xx, 429). */
+const CHUNK_ATTEMPTS = 4;
+
+type UploadError = { status?: number; title: string; detail?: string };
+
+async function toUploadError(res: Response, fallback: string): Promise<UploadError> {
+  const body = await res.json().catch(() => ({})) as { title?: string; message?: string; detail?: string; errors?: { msg?: string }[] };
+  return {
+    status: res.status,
+    title:  body.title ?? body.message ?? fallback,
+    detail: body.detail ?? body.errors?.[0]?.msg,
+  };
+}
+
+/** Sends one chunk, retrying transient failures with exponential backoff. 4xx (other than 429) fails immediately. */
+async function putChunk(url: string, blob: Blob, index: number): Promise<void> {
+  let lastError: UploadError | null = null;
+  for (let attempt = 0; attempt < CHUNK_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    try {
+      const res = await authFetch(url, {
+        method:  'PUT',
+        headers: { 'Content-Type': 'application/octet-stream' },
+        body:    blob,
+      });
+      if (res.ok) return;
+      lastError = await toUploadError(res, `Chunk ${index + 1} failed with HTTP ${res.status}`);
+      if (res.status < 500 && res.status !== 429) throw lastError;
+    } catch (e) {
+      if (e === lastError) throw e;           // non-retryable HTTP error from above
+      lastError = {
+        title:  'Upload network error',
+        detail: `Lost the connection while sending part ${index + 1}. Check your network and try again.`,
+      };
+    }
+  }
+  throw lastError;
+}
+
 /**
  * Uploads a Unity WebGL ZIP file and creates the simulation in the given catalog.
- * Uses multipart/form-data with XMLHttpRequest to support upload progress.
+ *
+ * Sent in chunks (size chosen by the server, ~10 MB) rather than one multipart
+ * POST: Railway's edge cuts any request whose body takes longer than 5 minutes
+ * to upload, which a several-hundred-MB ZIP on an ordinary uplink always does.
+ * Each chunk is a short request retried on its own, so a blip costs one chunk,
+ * not the whole upload. The final "complete" call assembles the parts and runs
+ * the same extraction/validation as before.
  *
  * @param catalogId  - Catalog node to link the simulation to
  * @param data       - Simulation metadata fields
  * @param zipFile    - The ZIP File object from the browser
- * @param onProgress - Optional progress callback (0-100)
+ * @param onProgress - Optional progress callback (0-100), by bytes sent
  */
 export async function uploadWebGLSimulation(
   catalogId: string,
@@ -522,127 +567,50 @@ export async function uploadWebGLSimulation(
   zipFile: File,
   onProgress?: (percent: number) => void,
 ): Promise<{ simulation: Simulation; catalogId: string }> {
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('zip_file', zipFile, zipFile.name);
-    formData.append('title', data.title);
-    if (data.description) formData.append('description', data.description);
-    if (data.difficulty) formData.append('difficulty', data.difficulty);
-    if (data.estimatedMinutes) formData.append('estimatedMinutes', String(data.estimatedMinutes));
-    if (data.visibility) formData.append('visibility', data.visibility);
-    if (data.status) formData.append('status', data.status);
-    if (data.thumbnailUrl) formData.append('thumbnailUrl', data.thumbnailUrl);
-    if (data.isFeatured) formData.append('isFeatured', String(data.isFeatured));
-    if (data.featuredOrder !== undefined) formData.append('featuredOrder', String(data.featuredOrder));
+  const base = `${UPLOAD_API_URL.replace(/\/+$/, '')}/simulation-catalogs/${catalogId}/simulations/webgl-upload/chunks`;
+  const json = { 'Content-Type': 'application/json' };
 
-    const xhr = new XMLHttpRequest();
+  const network = (detail: string): UploadError => ({ title: 'Upload network error', detail });
 
-    const baseUrl = UPLOAD_API_URL.replace(/\/+$/, '');
-    const uploadUrl =
-      `${baseUrl}/simulation-catalogs/${catalogId}/simulations/webgl-upload`;
+  // 1. Open an upload session.
+  const initRes = await authFetch(base, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify({ fileName: zipFile.name, fileSize: zipFile.size }),
+  }).catch(() => { throw network('Could not reach the server to start the upload. Check your connection and try again.'); });
+  if (!initRes.ok) throw await toUploadError(initRes, 'Could not start the upload');
+  const { uploadId, chunkSize, totalChunks } =
+    ((await initRes.json()) as ApiSuccess<{ uploadId: string; chunkSize: number; totalChunks: number }>).data;
 
-    console.log('WebGL upload URL:', uploadUrl);
+  // 2. Send the chunks in order.
+  onProgress?.(0);
+  for (let i = 0; i < totalChunks; i++) {
+    const blob = zipFile.slice(i * chunkSize, Math.min((i + 1) * chunkSize, zipFile.size));
+    await putChunk(`${base}/${uploadId}/${i}`, blob, i);
+    onProgress?.(Math.round((Math.min((i + 1) * chunkSize, zipFile.size) / zipFile.size) * 100));
+  }
 
-    xhr.open('POST', uploadUrl, true);
+  // 3. Assemble + extract + create the simulation. Multipart fields used to
+  //    arrive as strings, and the backend still parses them that way.
+  const fields: Record<string, string> = { title: data.title };
+  if (data.description)               fields.description      = data.description;
+  if (data.difficulty)                fields.difficulty       = data.difficulty;
+  if (data.estimatedMinutes)          fields.estimatedMinutes = String(data.estimatedMinutes);
+  if (data.visibility)                fields.visibility       = data.visibility;
+  if (data.status)                    fields.status           = data.status;
+  if (data.thumbnailUrl)              fields.thumbnailUrl     = data.thumbnailUrl;
+  if (data.isFeatured)                fields.isFeatured       = String(data.isFeatured);
+  if (data.featuredOrder !== undefined) fields.featuredOrder  = String(data.featuredOrder);
 
-    // Match the credentials behavior used by the shared API helper.
-    xhr.withCredentials = true;
-
-    // Covers the whole transfer *plus* server-side extraction. Must stay above
-    // the backend's UPLOAD_REQUEST_TIMEOUT_MIN (30 min) — a 350 MB ZIP on a
-    // ~5 Mbps uplink alone needs ~10 min, so the old 10 min cap was too tight.
-    xhr.timeout = 45 * 60 * 1000;
-
-    xhr.setRequestHeader('Accept', 'application/json');
-
-    const token = getAccessToken();
-
-    if (token) {
-      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-    }
-
-    // Do not manually set Content-Type.
-    // The browser must generate the multipart boundary.
-
-    const startedAt = Date.now();
-    let lastPercent = 0;
-    xhr.upload.addEventListener('progress', (event) => {
-      if (event.lengthComputable) {
-        lastPercent = Math.round((event.loaded / event.total) * 100);
-        onProgress?.(lastPercent);
-      }
-    });
-
-    xhr.onload = () => {
-      let body: Record<string, any> = {};
-
-      try {
-        body = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-      } catch {
-        body = {};
-      }
-
-      console.log('WebGL upload response:', {
-        status: xhr.status,
-        response: xhr.responseText,
-      });
-
-      if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(body.data ?? body);
-        return;
-      }
-
-      reject({
-        title:
-          body.title ??
-          body.message ??
-          `Upload failed with HTTP ${xhr.status}`,
-        detail:
-          body.detail ??
-          body.errors?.[0]?.msg ??
-          xhr.responseText ??
-          xhr.statusText,
-      });
-    };
-
-    xhr.onerror = () => {
-      console.error('WebGL upload network error:', {
-        url: uploadUrl,
-        status: xhr.status,
-        readyState: xhr.readyState,
-        response: xhr.responseText,
-      });
-
-      const minutes = Math.round((Date.now() - startedAt) / 60_000);
-      reject({
-        title: 'Upload network error',
-        detail:
-          lastPercent > 0
-            // Bytes were flowing, so CORS/URL are fine — the connection was
-            // closed mid-transfer (server request timeout, proxy limit, or a
-            // dropped network).
-            ? `The connection was closed after ${lastPercent}% (${minutes} min). ` +
-              'The server or a proxy likely timed out on this large file. Try again on a faster connection, or ask an administrator to raise the upload timeout.'
-            : 'The browser blocked or lost the upload request before any data was sent. Check CORS, the request URL, and the backend logs.',
-      });
-    };
-
-    xhr.ontimeout = () => {
-      reject({
-        title: 'Upload timeout',
-        detail: 'The ZIP upload or extraction exceeded the allowed request time.',
-      });
-    };
-
-    xhr.onabort = () => {
-      reject({
-        title: 'Upload cancelled',
-        detail: 'The upload request was aborted.',
-      });
-    };
-
-    xhr.send(formData);
+  const doneRes = await authFetch(`${base}/${uploadId}/complete`, {
+    method: 'POST',
+    headers: json,
+    body: JSON.stringify(fields),
+  }).catch(() => {
+    throw network('The file was uploaded, but the connection dropped while the server was processing it. Refresh the catalog — the simulation may still have been created.');
   });
+  if (!doneRes.ok) throw await toUploadError(doneRes, `Upload failed with HTTP ${doneRes.status}`);
+  return ((await doneRes.json()) as ApiSuccess<{ simulation: Simulation; catalogId: string }>).data;
 }
 
 // ── Simulation launch ─────────────────────────────────────────────────────────
