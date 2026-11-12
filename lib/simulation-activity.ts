@@ -4,7 +4,7 @@
  * All duration calculations are server-side; the client only stores session IDs.
  */
 
-import { api, getAccessToken } from './api';
+import { api, authFetch, getAccessToken } from './api';
 import { API_BASE_URL } from './constants';
 import type {
   ActivityStartResult,
@@ -302,17 +302,8 @@ export function flushClicksBeacon(sessionId: string, clicks: ClickEvent[]): void
  * Triggers a file-save dialog.
  */
 export async function downloadSessionClicksCsv(sessionId: string): Promise<void> {
-  const token = getAccessToken();
-  const url   = `${API_BASE_URL}/simulation-activity/${sessionId}/clicks/csv`;
-
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(url, {
-    method:      'GET',
-    headers,
-    credentials: 'include',
-  });
+  const url = `${API_BASE_URL}/simulation-activity/${sessionId}/clicks/csv`;
+  const res = await authFetch(url, { method: 'GET' });
 
   if (!res.ok) {
     // Parse the RFC 7807 error body the same way the api client does

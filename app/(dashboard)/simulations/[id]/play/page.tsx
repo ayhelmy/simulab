@@ -84,6 +84,20 @@ function formatElapsed(seconds: number): string {
   return `${pad(m)}:${pad(s)}`;
 }
 
+/**
+ * Origin of the document the iframe actually loads — computed from the same
+ * normalizeSecureUrl() value used as the iframe src, so an http:// launch URL
+ * upgraded to https:// still matches incoming messages.
+ */
+function frameOrigin(launchUrl: string | null | undefined): string | null {
+  if (!launchUrl) return null;
+  try {
+    return new URL(normalizeSecureUrl(launchUrl), window.location.href).origin;
+  } catch {
+    return null;
+  }
+}
+
 interface Props { params: Promise<{ id: string }> }
 
 export default function SimulationPlayPage({ params }: Props) {
@@ -133,8 +147,16 @@ export default function SimulationPlayPage({ params }: Props) {
   // window.parent.postMessage() for both mousedown and keydown events.
 
   useEffect(() => {
+    const expectedOrigin = frameOrigin(launchInfo?.launchUrl);
+    if (!expectedOrigin) return;
+
     const handleMessage = (e: MessageEvent) => {
-      if (!e.data) return;
+      // Only accept telemetry from our own simulation iframe — any other
+      // window (opener, other frames, extensions) could otherwise inject
+      // fabricated click/key events into the student's activity record.
+      if (e.origin !== expectedOrigin) return;
+      if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+      if (!e.data || typeof e.data !== 'object') return;
       if (!sessionIdRef.current || isEndedRef.current) return;
 
       const now = new Date().toISOString();
@@ -174,7 +196,7 @@ export default function SimulationPlayPage({ params }: Props) {
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [flushClicks]);
+  }, [flushClicks, launchInfo?.launchUrl]);
 
   // ── Structured simulation LMS event-contract bridge (additive — independent
   // of the click listener above). Generic across any simulation: the new
@@ -186,12 +208,8 @@ export default function SimulationPlayPage({ params }: Props) {
   useEffect(() => {
     if (!launchInfo?.buildUuid || !iframeRef.current) return;
 
-    let buildOrigin: string;
-    try {
-      buildOrigin = new URL(launchInfo.launchUrl, window.location.href).origin;
-    } catch {
-      return; // Unparseable launch URL — nothing to attach to.
-    }
+    const buildOrigin = frameOrigin(launchInfo.launchUrl);
+    if (!buildOrigin) return; // Unparseable launch URL — nothing to attach to.
 
     const detach = attachSimulationLms({
       frame: iframeRef.current,

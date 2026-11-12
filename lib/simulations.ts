@@ -3,7 +3,7 @@
  * Tree-based catalog support added in migration 018.
  */
 
-import { api, getAccessToken } from './api';
+import { api, authFetch, getAccessToken } from './api';
 import { API_BASE_URL, UPLOAD_API_URL } from './constants';
 import type { Simulation, SimulationCatalog, SimulationDetail, WebGLLaunchResult } from '@/types';
 import type { PaginationMeta } from '@/types/api';
@@ -436,16 +436,10 @@ export async function uploadSimulationThumbnail(
   const formData = new FormData();
   formData.append('thumbnail', file, file.name);
 
-  const token   = getAccessToken();
   const baseUrl = API_BASE_URL.replace(/\/+$/, '');
-  const res = await fetch(
+  const res = await authFetch(
     `${baseUrl}/simulation-catalogs/${catalogId}/simulations/${simId}/thumbnail`,
-    {
-      method:      'PATCH',
-      body:        formData,
-      credentials: 'include',
-      headers:     token ? { Authorization: `Bearer ${token}` } : {},
-    },
+    { method: 'PATCH', body: formData },
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -472,16 +466,10 @@ export async function uploadSimulationClickRegions(
   formData.append('image', imageFile, imageFile.name);
   formData.append('regions', regionsJson);
 
-  const token   = getAccessToken();
   const baseUrl = API_BASE_URL.replace(/\/+$/, '');
-  const res = await fetch(
+  const res = await authFetch(
     `${baseUrl}/simulation-catalogs/${catalogId}/simulations/${simId}/click-regions`,
-    {
-      method:      'PATCH',
-      body:        formData,
-      credentials: 'include',
-      headers:     token ? { Authorization: `Bearer ${token}` } : {},
-    },
+    { method: 'PATCH', body: formData },
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

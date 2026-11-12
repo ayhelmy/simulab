@@ -10,7 +10,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User } from '@/types';
 import { silentRefresh, logout as authLogout } from '@/lib/auth';
-import { setAccessToken } from '@/lib/api';
+import { setAccessToken, onSessionExpired } from '@/lib/api';
 import { getInstitution } from '@/lib/institutions';
 import { DEV_MOCK_AUTH, getDevMockUser } from '@/lib/devMock';
 
@@ -70,6 +70,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setLoading(false);
     });
+  }, []);
+
+  // Refresh cookie rejected mid-session (lib/api.ts authFetch) — drop the user
+  // so the dashboard layout redirects to /login?next=<current page>.
+  useEffect(() => {
+    if (DEV_MOCK_AUTH) return;
+    return onSessionExpired(() => setUser(null));
   }, []);
 
   // Fetch institution name whenever the user's own institutionId changes

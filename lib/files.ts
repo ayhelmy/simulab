@@ -1,5 +1,5 @@
 import { UPLOAD_API_URL } from './constants';
-import { getAccessToken } from './api';
+import { authFetch } from './api';
 
 export interface UploadedFile {
   url:      string;
@@ -12,15 +12,9 @@ export async function uploadLessonFile(file: File): Promise<UploadedFile> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const token = getAccessToken();
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const res = await fetch(`${UPLOAD_API_URL}/files/upload-file`, {
-    method:      'POST',
-    headers,
-    credentials: 'include',
-    body:        formData,
+  const res = await authFetch(`${UPLOAD_API_URL}/files/upload-file`, {
+    method: 'POST',
+    body:   formData,
   });
 
   if (!res.ok) {

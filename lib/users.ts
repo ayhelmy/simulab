@@ -2,7 +2,7 @@
  * Users & roles API helpers — SRS §4.2 USR-01 to USR-06; §4.3 PERM-01 to PERM-04.
  */
 
-import { api, getAccessToken } from './api';
+import { api, authFetch } from './api';
 import { API_BASE_URL } from './constants';
 import type { User, RoleInfo } from '@/types';
 import type { PaginationMeta } from '@/types/api';
@@ -116,10 +116,8 @@ export async function importValidate(file: File): Promise<ImportPreview> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE_URL}/users/import/validate`, {
+  const res = await authFetch(`${API_BASE_URL}/users/import/validate`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${getAccessToken() ?? ''}` },
-    credentials: 'include',
     body: formData,
   });
 
