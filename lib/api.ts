@@ -83,9 +83,13 @@ export async function authFetch(url: string, init: RequestInit = {}): Promise<Re
   const tokenUsed = _accessToken;
   const res = await send(tokenUsed);
 
-  // No token → the caller wasn't signed in; nothing to refresh.
-  if (res.status !== 401 || !tokenUsed || NO_REFRESH_RETRY.test(url)) return res;
+  if (res.status !== 401 || NO_REFRESH_RETRY.test(url)) return res;
 
+  // A 401 with no token attached usually means the in-memory token was lost
+  // while the refresh cookie is still valid (e.g. a protected call fired
+  // before/without the session restore). Try the cookie once rather than
+  // failing with "Missing or malformed Authorization header". Only reached on
+  // a 401, so public pages hitting public endpoints never trigger a refresh.
   // Another request may already have refreshed while this one was in flight.
   const fresh = _accessToken && _accessToken !== tokenUsed ? _accessToken : await refreshAccessToken();
   return fresh ? send(fresh) : res;
