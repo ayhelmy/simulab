@@ -44,13 +44,18 @@ body {
 
 /* Sidebar logo area */
 .simlearn-logo {
-  height: 64px;
+  min-height: 64px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  justify-content: center;
+  padding: 14px 18px;
   border-bottom: 1px solid rgba(180, 179, 179, 0.26);
   overflow: hidden;
   white-space: nowrap;
+}
+
+.simlearn-logo--collapsed {
+  padding: 14px 8px;
 }
 
 .simlearn-logo-full {

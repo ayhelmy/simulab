@@ -271,17 +271,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }}
       >
         {/* Logo */}
-        <div className="simlearn-logo">
-          <div className="simlearn-logo-icon">
-            {/* <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M8 12L11 15L16 9" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg> */}
-            <Image src="/Virtual-logo.png" alt="SimuLearn Logo" width={50} height={40} />
-          </div>
-          {!siderCollapsed && (
-            <span style={{  fontWeight: 800, fontSize: 15, marginLeft: 10, whiteSpace: 'nowrap' }}>
-              BEDO SimuLearn
-            </span>
+        <div className={`simlearn-logo${siderCollapsed ? ' simlearn-logo--collapsed' : ''}`}>
+          {siderCollapsed ? (
+            <Image src="/Virtual-logo2.png" alt="BEDO Virtual Lab" width={40} height={21} priority />
+          ) : (
+            <Image
+              src="/Virtual-logo.png"
+              alt="BEDO Virtual Lab"
+              width={1700}
+              height={900}
+              priority
+              style={{ width: '100%', height: 'auto', display: 'block' }}
+            />
           )}
         </div>
 
