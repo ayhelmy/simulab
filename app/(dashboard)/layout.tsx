@@ -278,8 +278,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Image
               src="/Virtual-logo.png"
               alt="BEDO Virtual Lab"
-              width={1700}
-              height={900}
+              width={1000}
+              height={600}
               priority
               style={{ width: '100%', height: 'auto', display: 'block' }}
             />
