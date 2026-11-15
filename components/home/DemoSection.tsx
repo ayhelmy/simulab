@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Modal } from 'antd';
 import { PlayCircleFilled, VideoCameraOutlined, RocketOutlined } from '@ant-design/icons';
 import type { PageContentItem, DemoExtra } from '@/lib/pageContent';
 import { colors, sectionContainerStyle, headingStyle, bodyTextStyle } from './homeTheme';
-import PlaceholderPanel from './PlaceholderPanel';
 
 const DEFAULT_DEMO_VIDEO = '/simulation_tour.mp4';
 
@@ -16,7 +14,8 @@ interface Props {
 
 export default function DemoSection({ demo }: Props) {
   const router = useRouter();
-  const [videoOpen, setVideoOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
 
   if (!demo) return null;
 
@@ -27,7 +26,14 @@ export default function DemoSection({ demo }: Props) {
   const watchLabel = extra.watchButtonLabel ?? 'Watch Demo';
   const launchLabel = extra.launchButtonLabel ?? 'Launch Sample Simulation';
   const videoUrl = extra.videoUrl || DEFAULT_DEMO_VIDEO;
-  const hasVideo = Boolean(videoUrl);
+
+  function handlePlay() {
+    const video = videoRef.current;
+    if (!video) return;
+    setPlaying(true);
+    video.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    void video.play();
+  }
 
   function handleLaunchSample() {
     if (extra.sampleSimulationId) {
@@ -38,21 +44,20 @@ export default function DemoSection({ demo }: Props) {
   }
 
   return (
-    <section style={{  }} aria-label="Product demo">
+    <section aria-label="Product demo">
       <div style={sectionContainerStyle}>
         <div
           className="home-hero-grid"
           style={{ display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 48, alignItems: 'center' }}
         >
           <div>
-            <h2 style={{ ...headingStyle}}>{title}</h2>
+            <h2 style={{ ...headingStyle }}>{title}</h2>
             <p style={{ ...bodyTextStyle, marginBottom: 28 }}>{description}</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
               <button
                 type="button"
-                disabled={!hasVideo}
-                onClick={() => setVideoOpen(true)}
-               style={{
+                onClick={handlePlay}
+                style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
                   background: colors.primary, color: '#fff', border: 'none',
                   borderRadius: 10, padding: '13px 22px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
@@ -63,13 +68,12 @@ export default function DemoSection({ demo }: Props) {
               <button
                 type="button"
                 onClick={handleLaunchSample}
-                 style={{
+                style={{
                   display: 'inline-flex', alignItems: 'center', gap: 8,
-                  background: '#fff', color: 'black', border: `1px solid black`,
+                  background: '#fff', color: 'black', border: '1px solid black',
                   borderRadius: 10, padding: '13px 22px', fontSize: 15, fontWeight: 700,
-                  cursor: hasVideo ? 'pointer' : 'not-allowed', opacity: hasVideo ? 1 : 0.5,
+                  cursor: 'pointer',
                 }}
-                
               >
                 <RocketOutlined /> {launchLabel}
               </button>
@@ -77,42 +81,29 @@ export default function DemoSection({ demo }: Props) {
           </div>
 
           <div style={{ position: 'relative' }}>
-            <button
-              type="button"
-              onClick={() => hasVideo && setVideoOpen(true)}
-              aria-label={hasVideo ? 'Play demo video' : 'Demo video preview'}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video
+              ref={videoRef}
+              src={extra.thumbnailUrl ? videoUrl : `${videoUrl}#t=0.1`}
+              poster={extra.thumbnailUrl ?? undefined}
+              controls={playing}
+              playsInline
+              preload="metadata"
+              onPlay={() => setPlaying(true)}
               style={{
-                display: 'block', width: '100%', border: 'none', padding: 0,
-                cursor: hasVideo ? 'pointer' : 'default', position: 'relative',
+                display: 'block', width: '100%', aspectRatio: '16 / 9',
+                objectFit: 'cover', borderRadius: 16, background: '#000',
               }}
-            >
-              {extra.thumbnailUrl ? (
-                <PlaceholderPanel
-                  src={extra.thumbnailUrl}
-                  alt="SimuLearn demo preview"
-                  aspectRatio="16 / 9"
-                  borderRadius={16}
-                  icon={<VideoCameraOutlined style={{ fontSize: 48, color: colors.accent, opacity: 0.45 }} />}
-                />
-              ) : (
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video
-                  src={`${videoUrl}#t=0.5`}
-                  muted
-                  playsInline
-                  preload="metadata"
-                  style={{
-                    display: 'block', width: '100%', aspectRatio: '16 / 9',
-                    objectFit: 'cover', borderRadius: 16, background: '#000',
-                  }}
-                />
-              )}
-              <span
-                aria-hidden="true"
+            />
+            {!playing && (
+              <button
+                type="button"
+                onClick={handlePlay}
+                aria-label="Play demo video"
                 style={{
-                  position: 'absolute', inset: 0, borderRadius: 16,
+                  position: 'absolute', inset: 0, borderRadius: 16, border: 'none', padding: 0,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  background: 'rgba(65,108,130,0.18)',
+                  background: 'rgba(65,108,130,0.18)', cursor: 'pointer',
                 }}
               >
                 <span style={{
@@ -122,30 +113,11 @@ export default function DemoSection({ demo }: Props) {
                 }}>
                   <PlayCircleFilled style={{ fontSize: 32, color: '#fff' }} />
                 </span>
-              </span>
-            </button>
+              </button>
+            )}
           </div>
         </div>
       </div>
-
-      <Modal
-        open={videoOpen}
-        onCancel={() => setVideoOpen(false)}
-        footer={null}
-        width={860}
-        destroyOnHidden
-        title={title}
-      >
-        {videoUrl && (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video
-            src={videoUrl}
-            controls
-            autoPlay
-            style={{ width: '100%', borderRadius: 8 }}
-          />
-        )}
-      </Modal>
     </section>
   );
 }
