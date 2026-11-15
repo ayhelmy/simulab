@@ -99,7 +99,7 @@ export const HOME_PAGE_FALLBACK: HomePagePayload = {
       'Explore BEDO lab experiences through interactive 3D simulations designed to help learners visualize, practice, and understand complex lab concepts online.',
     extra: {
       thumbnailUrl: null,
-      videoUrl: null,
+      videoUrl: '/simulation_tour.mp4',
       sampleSimulationId: null,
       watchButtonLabel: 'Watch Demo',
       launchButtonLabel: 'Launch Sample Simulation',

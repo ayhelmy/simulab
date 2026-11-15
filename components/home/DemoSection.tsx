@@ -8,6 +8,8 @@ import type { PageContentItem, DemoExtra } from '@/lib/pageContent';
 import { colors, sectionContainerStyle, headingStyle, bodyTextStyle } from './homeTheme';
 import PlaceholderPanel from './PlaceholderPanel';
 
+const DEFAULT_DEMO_VIDEO = '/simulation_tour.mp4';
+
 interface Props {
   demo: PageContentItem | null;
 }
@@ -24,7 +26,8 @@ export default function DemoSection({ demo }: Props) {
     ?? 'Explore BEDO lab experiences through interactive 3D simulations designed to help learners visualize, practice, and understand complex lab concepts online.';
   const watchLabel = extra.watchButtonLabel ?? 'Watch Demo';
   const launchLabel = extra.launchButtonLabel ?? 'Launch Sample Simulation';
-  const hasVideo = Boolean(extra.videoUrl);
+  const videoUrl = extra.videoUrl || DEFAULT_DEMO_VIDEO;
+  const hasVideo = Boolean(videoUrl);
 
   function handleLaunchSample() {
     if (extra.sampleSimulationId) {
@@ -83,13 +86,27 @@ export default function DemoSection({ demo }: Props) {
                 cursor: hasVideo ? 'pointer' : 'default', position: 'relative',
               }}
             >
-              <PlaceholderPanel
-                src={extra.thumbnailUrl}
-                alt="SimuLearn demo preview"
-                aspectRatio="16 / 9"
-                borderRadius={16}
-                icon={<VideoCameraOutlined style={{ fontSize: 48, color: colors.accent, opacity: 0.45 }} />}
-              />
+              {extra.thumbnailUrl ? (
+                <PlaceholderPanel
+                  src={extra.thumbnailUrl}
+                  alt="SimuLearn demo preview"
+                  aspectRatio="16 / 9"
+                  borderRadius={16}
+                  icon={<VideoCameraOutlined style={{ fontSize: 48, color: colors.accent, opacity: 0.45 }} />}
+                />
+              ) : (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video
+                  src={`${videoUrl}#t=0.5`}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  style={{
+                    display: 'block', width: '100%', aspectRatio: '16 / 9',
+                    objectFit: 'cover', borderRadius: 16, background: '#000',
+                  }}
+                />
+              )}
               <span
                 aria-hidden="true"
                 style={{
@@ -119,10 +136,10 @@ export default function DemoSection({ demo }: Props) {
         destroyOnHidden
         title={title}
       >
-        {extra.videoUrl && (
+        {videoUrl && (
           // eslint-disable-next-line jsx-a11y/media-has-caption
           <video
-            src={extra.videoUrl}
+            src={videoUrl}
             controls
             autoPlay
             style={{ width: '100%', borderRadius: 8 }}
