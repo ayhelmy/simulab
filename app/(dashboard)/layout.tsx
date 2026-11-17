@@ -281,7 +281,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               width={1000}
               height={600}
               priority
-              style={{ width: '80%', height: 'auto', display: 'block' }}
+              style={{ width: '100%', height: 'auto', display: 'block' }}
             />
           )}
         </div>
